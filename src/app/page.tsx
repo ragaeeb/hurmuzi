@@ -58,26 +58,34 @@ export default function Home() {
         [romName],
     );
 
-    const handleFileDrop = useCallback((file: File) => {
+    const handleFileDrop = useCallback(async (file: File) => {
         if (!isValidRomFile(file.name)) {
             alert(`Invalid file type. Please use a SNES ROM file (${getValidRomExtensions()})`);
             return;
         }
 
-        const url = URL.createObjectURL(file);
-        const saved = getSavedChannelStates(file.name);
+        // Convert File to data URL (not blob URL)
+        const reader = new FileReader();
 
-        if (saved) {
-            console.log(`📂 Found saved channel states for "${file.name}":`, saved);
-            setSavedChannelStates(saved);
-        } else {
-            setSavedChannelStates(null);
-        }
+        reader.onload = (e) => {
+            const dataUrl = e.target?.result as string;
 
-        setRomName(file.name);
-        setRomUrl(url);
-        setGameStarted(false);
-        setCoreOptions([]);
+            const saved = getSavedChannelStates(file.name);
+
+            if (saved) {
+                console.log(`📂 Found saved channel states for "${file.name}":`, saved);
+                setSavedChannelStates(saved);
+            } else {
+                setSavedChannelStates(null);
+            }
+
+            setRomName(file.name);
+            setRomUrl(dataUrl); // Use data URL instead
+            setGameStarted(false);
+            setCoreOptions([]);
+        };
+
+        reader.readAsDataURL(file); // Read as data URL
     }, []);
 
     const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -117,15 +125,12 @@ export default function Home() {
     );
 
     const handleClearRom = useCallback(() => {
-        if (romUrl) {
-            URL.revokeObjectURL(romUrl);
-        }
         setRomUrl(null);
         setRomName('');
         setGameStarted(false);
         setCoreOptions([]);
         setSavedChannelStates(null);
-    }, [romUrl]);
+    }, []);
 
     // Prevent arrow keys from scrolling
     useEffect(() => {
@@ -148,15 +153,6 @@ export default function Home() {
             window.removeEventListener('keydown', handleKeyDown, { capture: true });
         };
     }, []);
-
-    // Cleanup blob URL
-    useEffect(() => {
-        return () => {
-            if (romUrl) {
-                URL.revokeObjectURL(romUrl);
-            }
-        };
-    }, [romUrl]);
 
     return (
         <div className="min-h-screen bg-[#0a0a1a] font-mono">

@@ -78,7 +78,7 @@ export function useEmulatorSetup({
             iframeWin.EJS_gameUrl = gameUrl;
             iframeWin.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
             iframeWin.EJS_color = '#1a1a2e';
-            iframeWin.EJS_startOnLoaded = isReload;
+            iframeWin.EJS_startOnLoaded = true;
 
             // Store current values in closure
             const currentPendingSettings = pendingSettings;
