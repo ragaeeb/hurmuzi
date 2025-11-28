@@ -192,7 +192,7 @@ export default function Home() {
                             <span className="text-3xl">🎮</span>
                             <h1 className="font-bold text-2xl tracking-tight md:text-4xl">
                                 <span className="bg-gradient-to-r from-red-500 via-yellow-400 to-green-400 bg-clip-text text-transparent">
-                                    SNES EMULATOR
+                                    Hurmuzi
                                 </span>
                             </h1>
                             <span className="text-3xl">🕹️</span>

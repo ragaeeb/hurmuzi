@@ -215,7 +215,7 @@ const GameEmulator = forwardRef<GameEmulatorRef, GameEmulatorProps>(function Gam
             <iframe
                 key={iframeKey}
                 ref={iframeRef}
-                title="SNES Emulator"
+                title="Hurmuzi"
                 className="h-full w-full border-0"
                 style={{ minHeight: '480px' }}
                 sandbox="allow-scripts allow-same-origin allow-pointer-lock"
