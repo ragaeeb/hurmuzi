@@ -239,6 +239,7 @@ export default function Home() {
                                             id="rom-url-input"
                                             name="rom-url"
                                             type="url"
+                                            defaultValue={process.env.NEXT_PUBLIC_DEFAULT_ROM_URL}
                                             placeholder="https://raw.githubusercontent.com/..."
                                             className="flex-1 rounded-lg border border-[#2a2a4a] bg-[#0f0f23] px-4 py-3 text-[#cacafa] placeholder-[#4a4a6a] focus:border-cyan-400/50 focus:outline-none"
                                         />
@@ -251,6 +252,55 @@ export default function Home() {
                                     </div>
                                     <p className="mt-3 text-[#6a6a8a] text-sm">
                                         💡 Paste a GitHub raw URL or direct ROM link
+                                    </p>
+                                </form>
+                            </div>
+
+                            {/* Divider */}
+                            <div className="flex items-center gap-4 px-6 py-4">
+                                <div className="h-px flex-1 bg-[#2a2a4a]" />
+                                <span className="text-[#4a4a6a] text-sm">OR</span>
+                                <div className="h-px flex-1 bg-[#2a2a4a]" />
+                            </div>
+
+                            {/* GitHub Repository Browser */}
+                            <div className="border-[#2a2a4a] border-b bg-[#0a0a1a] p-6">
+                                <form
+                                    onSubmit={(e) => {
+                                        e.preventDefault();
+                                        const formData = new FormData(e.currentTarget);
+                                        const repoUrl = formData.get('repo-url') as string;
+                                        if (repoUrl?.trim()) {
+                                            router.push(`/list?url=${encodeURIComponent(repoUrl)}`);
+                                        } else {
+                                            alert('Please enter a GitHub repository URL');
+                                        }
+                                    }}
+                                >
+                                    <label
+                                        htmlFor="repo-url-input"
+                                        className="mb-3 block font-bold text-green-400 text-lg"
+                                    >
+                                        📚 Browse GitHub ROM Repository
+                                    </label>
+                                    <div className="flex gap-3">
+                                        <input
+                                            id="repo-url-input"
+                                            name="repo-url"
+                                            type="url"
+                                            defaultValue={process.env.NEXT_PUBLIC_DEFAULT_REPO_URL}
+                                            placeholder="https://github.com/user/rom-collection"
+                                            className="flex-1 rounded-lg border border-[#2a2a4a] bg-[#0f0f23] px-4 py-3 text-[#cacafa] placeholder-[#4a4a6a] focus:border-green-400/50 focus:outline-none"
+                                        />
+                                        <button
+                                            type="submit"
+                                            className="rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 px-8 py-3 font-bold text-white transition-all hover:from-green-500 hover:to-emerald-500"
+                                        >
+                                            Browse
+                                        </button>
+                                    </div>
+                                    <p className="mt-3 text-[#6a6a8a] text-sm">
+                                        🗂️ View and search all compatible ROMs in a repository
                                     </p>
                                 </form>
                             </div>
@@ -344,23 +394,6 @@ export default function Home() {
                     </div>
                 </div>
             </main>
-
-            {/* Footer */}
-            <footer className="mt-12 border-[#2a2a4a] border-t py-6">
-                <div className="mx-auto max-w-6xl px-6 text-center">
-                    <p className="text-[#4a4a7a] text-xs">
-                        Powered by{' '}
-                        <a
-                            href="https://emulatorjs.org"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-yellow-400/80 transition-colors hover:text-yellow-400"
-                        >
-                            EmulatorJS
-                        </a>
-                    </p>
-                </div>
-            </footer>
         </div>
     );
 }

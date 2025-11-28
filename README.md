@@ -2,23 +2,32 @@
 
 A web-based SNES emulator with advanced sound channel mixing capabilities. Play SNES games directly in your browser with granular control over each of the 8 audio channels.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/ragaeeb/hurmuzi)
+[![wakatime](https://wakatime.com/badge/user/a0b906ce-b8e7-4463-8bce-383238df6d4b/project/3bf575f0-9916-409b-8189-e01c57c9aac0.svg)](https://wakatime.com/badge/user/a0b906ce-b8e7-4463-8bce-383238df6d4b/project/3bf575f0-9916-409b-8189-e01c57c9aac0)
+[![codecov](https://codecov.io/gh/ragaeeb/hurmuzi/graph/badge.svg?token=VQ1PMX2XAH)](https://codecov.io/gh/ragaeeb/hurmuzi)
+[![Vercel Deploy](https://deploy-badge.vercel.app/vercel/hurmuzi)](https://hurmuzi.vercel.app)
+[![typescript](https://badgen.net/badge/icon/typescript?icon=typescript&label&color=blue)](https://www.typescriptlang.org)
+[![Node.js CI](https://github.com/ragaeeb/hurmuzi/actions/workflows/build.yml/badge.svg)](https://github.com/ragaeeb/hurmuzi/actions/workflows/build.yml)
+![Bun](https://img.shields.io/badge/Bun-%23000000.svg?style=for-the-badge&logo=bun&logoColor=white)
+![GitHub License](https://img.shields.io/github/license/ragaeeb/hurmuzi)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Features
 
 - **🎵 Advanced Audio Control**: Independently mute/unmute each of the 8 SNES SPC700 sound channels
 - **💾 State Persistence**: Channel settings automatically saved per ROM
+- **📚 ROM Library Browser**: Browse and search ROMs directly from GitHub repositories
 - **🎮 Full SNES Support**: Play any SNES ROM file (.smc, .sfc, .fig, .swc, .bs, .st)
 - **🔄 Save States**: Built-in save/load state functionality
 - **⚡ Fast Forward**: Speed up gameplay with fast-forward mode
 - **📱 Responsive Design**: Works on desktop and mobile browsers
+- **🚀 Virtual Scrolling**: Handle 3000+ ROMs with smooth performance
 - **🔒 Privacy First**: All ROM processing happens locally in your browser
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 18+ or Bun
+- Node.js 24+ or Bun v1.3.3+
 - Modern web browser with iframe support
 
 ### Installation
@@ -50,10 +59,33 @@ bun start
 
 ## Usage
 
-1. **Load a ROM**: Drag and drop a SNES ROM file onto the page, or click to browse
-2. **Play**: Click play button in the emulator to start the game
-3. **Mix Audio**: Use the Sound Channel Mixer to control individual audio channels
-4. **Save Progress**: Use F2 to save state, F4 to load state
+### Loading ROMs
+
+You have three ways to load ROMs:
+
+#### 1. Drag & Drop
+Drag and drop a SNES ROM file onto the home page
+
+#### 2. Direct URL
+Paste a direct ROM URL (GitHub raw URL or direct download link)
+
+#### 3. Browse GitHub Repository (NEW! 🎉)
+1. Paste a GitHub repository URL (e.g., `https://github.com/user/roms`)
+2. Browse through all compatible ROMs
+3. Search/filter ROMs by name
+4. Click to play instantly
+
+The ROM browser features:
+- **Virtual scrolling** for handling 3000+ ROMs efficiently
+- **Smart search** with form submission (no re-renders on each keystroke)
+- **Automatic filtering** for compatible ROM formats
+- **File size display** for each ROM
+
+### Playing Games
+
+1. **Play**: Click play button in the emulator to start the game
+2. **Mix Audio**: Use the Sound Channel Mixer to control individual audio channels
+3. **Save Progress**: Use F2 to save state, F4 to load state
 
 ### Keyboard Controls
 
@@ -97,22 +129,27 @@ hurmuzi/
 ├── src/
 │   ├── app/
 │   │   ├── components/
-│   │   │   ├── GameEmulator.tsx    # Main emulator component
-│   │   │   └── SoundChannelMixer.tsx # Audio mixing UI
-│   │   ├── page.tsx                 # Home page
-│   │   └── layout.tsx               # Root layout
+│   │   │   ├── GameEmulator.tsx      # Main emulator component
+│   │   │   ├── SoundChannelMixer.tsx # Audio mixing UI
+│   │   │   └── footer.tsx            # Unified footer component
+│   │   ├── list/
+│   │   │   └── page.tsx              # ROM library browser (NEW!)
+│   │   ├── play/
+│   │   │   └── page.tsx              # Game player page
+│   │   ├── page.tsx                  # Home page
+│   │   └── layout.tsx                # Root layout with footer
 │   ├── lib/
 │   │   ├── emulator/
-│   │   │   ├── types.ts             # Type definitions
-│   │   │   ├── utils.ts             # Emulator utilities
-│   │   │   ├── channelState.ts      # Channel state logic
-│   │   │   └── __tests__/           # Unit tests
+│   │   │   ├── types.ts              # Type definitions
+│   │   │   ├── utils.ts              # Emulator utilities
+│   │   │   ├── channelState.ts       # Channel state logic
+│   │   │   └── __tests__/            # Unit tests
 │   │   └── storage/
-│   │       ├── channelStates.ts     # localStorage utilities
-│   │       └── __tests__/           # Unit tests
+│   │       ├── channelStates.ts      # localStorage utilities
+│   │       └── __tests__/            # Unit tests
 │   └── hooks/
-│       └── useEmulatorSetup.ts      # Emulator setup hook
-├── public/                          # Static assets
+│       └── useEmulatorSetup.ts       # Emulator setup hook
+├── public/                           # Static assets
 └── package.json
 ```
 
@@ -134,6 +171,7 @@ bun test --watch
 - **Tailwind CSS 4** - Styling
 - **EmulatorJS** - SNES emulation core
 - **Bun** - Fast JavaScript runtime and test runner
+- **GitHub API** - ROM repository browsing
 
 ## Development
 
@@ -193,6 +231,7 @@ MIT License - see LICENSE file for details
 - [EmulatorJS](https://emulatorjs.org) - Emulation core
 - SNES9x - Original SNES emulator
 - Nintendo - Original SNES hardware and games
+- GitHub API - ROM repository browsing
 
 ---
 

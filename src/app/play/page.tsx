@@ -315,23 +315,6 @@ function PlayContent() {
                     </div>
                 </div>
             </main>
-
-            {/* Footer */}
-            <footer className="mt-12 border-[#2a2a4a] border-t py-6">
-                <div className="mx-auto max-w-6xl px-6 text-center">
-                    <p className="text-[#4a4a7a] text-xs">
-                        Powered by{' '}
-                        <a
-                            href="https://emulatorjs.org"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-yellow-400/80 transition-colors hover:text-yellow-400"
-                        >
-                            EmulatorJS
-                        </a>
-                    </p>
-                </div>
-            </footer>
         </div>
     );
 }

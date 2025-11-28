@@ -24,9 +24,14 @@ src/
 ├── app/                          # Next.js App Router
 │   ├── components/               # React components
 │   │   ├── GameEmulator.tsx     # Emulator iframe management
-│   │   └── SoundChannelMixer.tsx # Audio channel UI
+│   │   ├── SoundChannelMixer.tsx # Audio channel UI
+│   │   └── footer.tsx           # Unified footer component
+│   ├── list/                    # ROM library browser
+│   │   └── page.tsx             # Browse ROMs from GitHub repos
+│   ├── play/                    # Game player page
+│   │   └── page.tsx             # Emulator with controls
 │   ├── page.tsx                 # Home page (client component)
-│   ├── layout.tsx               # Root layout
+│   ├── layout.tsx               # Root layout with footer
 │   └── globals.css              # Global styles
 ├── lib/                          # Business logic
 │   ├── emulator/
@@ -67,6 +72,61 @@ UI State (what user wants) → Effective State (what's actually playing)
 
 - Muting: UI → Effective (immediate)
 - Unmuting: UI ≠ Effective until reload (shows pending indicator)
+
+### ROM Library Browser
+
+The `/list` page allows users to browse ROMs from GitHub repositories:
+
+#### GitHub API Integration
+
+```typescript
+// Fetch repository tree
+const apiUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/master?recursive=1`;
+const response = await fetch(apiUrl);
+const data: GitHubTreeResponse = await response.json();
+
+// Filter for compatible ROMs
+const compatibleRoms = data.tree.filter(
+    (item) => item.type === 'blob' && isValidRomFile(item.path)
+);
+```
+
+#### Virtual Scrolling Implementation
+
+For handling 3000+ ROMs efficiently:
+
+```typescript
+// Constants
+const ITEM_HEIGHT = 60; // Fixed height per item
+const VIEWPORT_BUFFER = 5; // Extra items to render
+
+// Calculate visible range
+const startIndex = Math.max(0, Math.floor(scrollTop / ITEM_HEIGHT) - VIEWPORT_BUFFER);
+const endIndex = Math.min(
+    totalItems - 1,
+    Math.ceil((scrollTop + viewportHeight) / ITEM_HEIGHT) + VIEWPORT_BUFFER
+);
+
+// Only render visible items
+const visibleRoms = allRoms.slice(startIndex, endIndex + 1);
+```
+
+#### Performance Patterns
+
+1. **Uncontrolled Form Input**: Search uses form submission instead of `onChange` to avoid re-renders
+2. **useMemo**: Memoize visible ROM calculations
+3. **Fixed Heights**: All list items have identical height for predictable scrolling
+4. **Transform Offset**: Use `translateY()` for smooth virtual positioning
+
+### Footer Component
+
+Unified footer component used across all pages:
+
+- Located at `src/app/components/footer.tsx`
+- Added to `layout.tsx` for global availability
+- Displays author info, version, GitHub link, and EmulatorJS attribution
+- Reads package.json for dynamic version and author info
+- Styled with retro gaming aesthetic matching the app
 
 ## Development Conventions
 
