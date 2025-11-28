@@ -1,479 +1,399 @@
-"use client";
+'use client';
 
-import dynamic from "next/dynamic";
-import { useRef, useState, useCallback, useEffect } from "react";
-import type { GameEmulatorRef, CoreOption } from "./components/GameEmulator";
-import SoundChannelMixer from "./components/SoundChannelMixer";
-
-const GameEmulator = dynamic(() => import("./components/GameEmulator"), {
-  ssr: false,
-  loading: () => (
-    <div className="flex items-center justify-center h-full min-h-[480px] bg-[#0f0f23]">
-      <div className="flex flex-col items-center gap-4">
-        <div className="w-12 h-12 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin" />
-        <span className="text-yellow-400 font-mono text-sm tracking-wider animate-pulse">
-          Loading Emulator...
-        </span>
-      </div>
-    </div>
-  ),
-});
-
-// Helper to get saved channel states from localStorage
-function getSavedChannelStates(romName: string): boolean[] | null {
-  try {
-    const saved = localStorage.getItem(`snes-channels-${romName}`);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length === 8) {
-        return parsed;
-      }
-    }
-  } catch (e) {
-    console.warn("Failed to load saved channel states:", e);
-  }
-  return null;
-}
-
-// Helper to save channel states to localStorage
-function saveChannelStates(romName: string, states: boolean[]) {
-  try {
-    localStorage.setItem(`snes-channels-${romName}`, JSON.stringify(states));
-    console.log(`💾 Saved channel states for "${romName}"`);
-  } catch (e) {
-    console.warn("Failed to save channel states:", e);
-  }
-}
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { getValidRomExtensions, isValidRomFile } from '@/lib/emulator/utils';
 
 export default function Home() {
-  const emulatorRef = useRef<GameEmulatorRef>(null);
-  const [gameStarted, setGameStarted] = useState(false);
-  const [coreOptions, setCoreOptions] = useState<CoreOption[]>([]);
-  const [romUrl, setRomUrl] = useState<string | null>(null);
-  const [romName, setRomName] = useState<string>("");
-  const [isDragging, setIsDragging] = useState(false);
-  const [savedChannelStates, setSavedChannelStates] = useState<boolean[] | null>(null);
+    const router = useRouter();
+    const [isDragging, setIsDragging] = useState(false);
 
-  const handleGameReady = useCallback((options: CoreOption[]) => {
-    setGameStarted(true);
-    setCoreOptions(options);
-  }, []);
-
-  const handleSetVariable = useCallback((key: string, value: string): boolean => {
-    if (emulatorRef.current) {
-      return emulatorRef.current.setVariable(key, value);
-    }
-    return false;
-  }, []);
-
-  const handleReloadEmulator = useCallback(async (pendingSettings: Record<string, string>): Promise<void> => {
-    if (emulatorRef.current) {
-      setGameStarted(false);
-      await emulatorRef.current.reloadEmulator(pendingSettings);
-    }
-  }, []);
-
-  // Handle saving channel states
-  const handleSaveChannelStates = useCallback((states: boolean[]) => {
-    if (romName) {
-      saveChannelStates(romName, states);
-    }
-  }, [romName]);
-
-  // Handle file drop
-  const handleFileDrop = useCallback((file: File) => {
-    // Validate file extension
-    const validExtensions = ['.smc', '.sfc', '.fig', '.swc', '.bs', '.st'];
-    const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
-    
-    if (!validExtensions.includes(ext)) {
-      alert(`Invalid file type. Please use a SNES ROM file (${validExtensions.join(', ')})`);
-      return;
-    }
-
-    // Create blob URL for the ROM
-    const url = URL.createObjectURL(file);
-    
-    // Check for saved channel states
-    const saved = getSavedChannelStates(file.name);
-    if (saved) {
-      console.log(`📂 Found saved channel states for "${file.name}":`, saved);
-      setSavedChannelStates(saved);
-    } else {
-      setSavedChannelStates(null);
-    }
-    
-    setRomName(file.name);
-    setRomUrl(url);
-    setGameStarted(false);
-    setCoreOptions([]);
-  }, []);
-
-  // Drag and drop handlers
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      handleFileDrop(files[0]);
-    }
-  }, [handleFileDrop]);
-
-  // File input handler
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      handleFileDrop(files[0]);
-    }
-  }, [handleFileDrop]);
-
-  // Clear ROM and go back to drop zone
-  const handleClearRom = useCallback(() => {
-    if (romUrl) {
-      URL.revokeObjectURL(romUrl);
-    }
-    setRomUrl(null);
-    setRomName("");
-    setGameStarted(false);
-    setCoreOptions([]);
-    setSavedChannelStates(null);
-  }, [romUrl]);
-
-  // Prevent arrow keys from scrolling the page when game has focus
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const activeElement = document.activeElement;
-      const isIframeFocused = activeElement?.tagName === 'IFRAME';
-      const gameContainer = document.querySelector('.game-container');
-      const isGameAreaFocused = gameContainer?.contains(activeElement as Node);
-      
-      if (isIframeFocused || isGameAreaFocused) {
-        const gameKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Space'];
-        if (gameKeys.includes(e.key) || gameKeys.includes(e.code)) {
-          e.preventDefault();
+    const handleFileDrop = async (file: File) => {
+        if (!isValidRomFile(file.name)) {
+            alert(`Invalid file type. Please use a SNES ROM file (${getValidRomExtensions()})`);
+            return;
         }
-      }
+
+        // Convert to data URL and store in sessionStorage
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const dataUrl = e.target?.result as string;
+            // Store ROM data in sessionStorage (no URL length limits)
+            sessionStorage.setItem('romData', dataUrl);
+            sessionStorage.setItem('romName', file.name);
+            // Navigate with just the name in URL
+            router.push(`/play?name=${encodeURIComponent(file.name)}`);
+        };
+        reader.readAsDataURL(file);
     };
 
-    window.addEventListener('keydown', handleKeyDown, { capture: true });
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown, { capture: true });
+    const handleUrlSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        const form = e.currentTarget;
+        const formData = new FormData(form);
+        const url = formData.get('rom-url') as string;
+
+        if (!url?.trim()) {
+            alert('Please enter a URL');
+            return;
+        }
+
+        try {
+            let downloadUrl: string;
+            let filename: string;
+            let isGitHubApiBlob = false;
+
+            // Check if it's a GitHub API blob URL
+            if (url.includes('api.github.com/repos/') && url.includes('/git/blobs/')) {
+                // GitHub API blob URL - need to fetch JSON first
+                isGitHubApiBlob = true;
+                downloadUrl = url;
+                // We'll get the filename from user or default to game.sfc
+                filename = 'game.sfc'; // Default, will be updated if we can infer
+            } else if (url.includes('raw.githubusercontent.com')) {
+                // Direct raw URL
+                downloadUrl = url;
+                const urlPath = new URL(url).pathname;
+                filename = decodeURIComponent(urlPath.split('/').pop() || 'game.sfc');
+            } else if (url.includes('github.com') && url.includes('/blob/')) {
+                // Convert github.com/user/repo/blob/branch/path to raw URL
+                const parts = url.split('/blob/');
+                if (parts.length === 2) {
+                    const [base, pathPart] = parts;
+                    downloadUrl = `${base.replace('github.com', 'raw.githubusercontent.com')}/${pathPart}`;
+                    filename = decodeURIComponent(pathPart.split('/').pop() || 'game.sfc');
+                } else {
+                    throw new Error('Invalid GitHub URL format');
+                }
+            } else {
+                // Assume it's a direct download URL
+                downloadUrl = url;
+                const urlPath = new URL(url).pathname;
+                filename = decodeURIComponent(urlPath.split('/').pop() || 'game.sfc');
+            }
+
+            console.log('📥 Downloading ROM from:', downloadUrl);
+
+            let blob: Blob;
+
+            if (isGitHubApiBlob) {
+                // Fetch the GitHub API blob response
+                const response = await fetch(downloadUrl);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
+                }
+
+                const jsonData = await response.json();
+
+                // GitHub API returns base64 encoded content
+                if (!jsonData.content || jsonData.encoding !== 'base64') {
+                    throw new Error('Unexpected GitHub API response format');
+                }
+
+                // Decode base64 to binary
+                const base64Content = jsonData.content.replace(/\s/g, ''); // Remove whitespace
+                const binaryString = atob(base64Content);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+
+                blob = new Blob([bytes], { type: 'application/octet-stream' });
+
+                // Prompt user for filename since API doesn't provide it
+                const userFilename = prompt('Enter ROM filename (e.g., game.sfc):', 'game.sfc');
+                if (!userFilename) {
+                    throw new Error('Filename required');
+                }
+                filename = userFilename;
+            } else {
+                // Direct download
+                const response = await fetch(downloadUrl);
+                if (!response.ok) {
+                    throw new Error(`Failed to download: ${response.status} ${response.statusText}`);
+                }
+                blob = await response.blob();
+            }
+
+            // Validate filename
+            if (!isValidRomFile(filename)) {
+                throw new Error(`Invalid file type. Must be: ${getValidRomExtensions()}`);
+            }
+
+            console.log('✅ ROM downloaded:', filename, 'Size:', (blob.size / 1024 / 1024).toFixed(2), 'MB');
+
+            // Clear form before async operation
+            form.reset();
+
+            // Convert to data URL and navigate
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const dataUrl = e.target?.result as string;
+                // Store in sessionStorage
+                sessionStorage.setItem('romData', dataUrl);
+                sessionStorage.setItem('romName', filename);
+                router.push(`/play?name=${encodeURIComponent(filename)}`);
+            };
+            reader.readAsDataURL(blob);
+        } catch (error) {
+            console.error('Failed to load ROM from URL:', error);
+            alert(error instanceof Error ? error.message : 'Failed to download ROM');
+        }
     };
-  }, []);
 
-  // Cleanup blob URL on unmount
-  useEffect(() => {
-    return () => {
-      if (romUrl) {
-        URL.revokeObjectURL(romUrl);
-      }
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(true);
     };
-  }, [romUrl]);
 
-  return (
-    <div className="min-h-screen bg-[#0a0a1a] font-mono">
-      {/* Scanline overlay */}
-      <div className="fixed inset-0 pointer-events-none z-50 opacity-[0.03]">
-        <div
-          className="w-full h-full"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(0,0,0,0.3) 1px, rgba(0,0,0,0.3) 2px)",
-          }}
-        />
-      </div>
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+    };
 
-      {/* Header */}
-      <header className="relative border-b border-[#2a2a4a] bg-gradient-to-b from-[#1a1a3a] to-[#0f0f23]">
-        <div className="max-w-6xl mx-auto px-6 py-8">
-          <div className="flex flex-col items-center gap-2">
-            <div className="flex items-center gap-3">
-              <span className="text-3xl">🎮</span>
-              <h1 className="text-2xl md:text-4xl font-bold tracking-tight">
-                <span className="bg-gradient-to-r from-red-500 via-yellow-400 to-green-400 bg-clip-text text-transparent">
-                  SNES EMULATOR
-                </span>
-              </h1>
-              <span className="text-3xl">🕹️</span>
-            </div>
-            <p className="text-[#6a6a9a] text-sm tracking-widest uppercase">
-              {romName ? romName : "Play SNES games in your browser"}
-            </p>
-          </div>
-        </div>
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
 
-        {/* Decorative pixels */}
-        <div className="absolute top-4 left-4 flex gap-1 opacity-50">
-          <div className="w-2 h-2 bg-red-500" />
-          <div className="w-2 h-2 bg-yellow-400" />
-          <div className="w-2 h-2 bg-green-500" />
-        </div>
-        <div className="absolute top-4 right-4 flex gap-1 opacity-50">
-          <div className="w-2 h-2 bg-green-500" />
-          <div className="w-2 h-2 bg-yellow-400" />
-          <div className="w-2 h-2 bg-red-500" />
-        </div>
-      </header>
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            handleFileDrop(files[0]);
+        }
+    };
 
-      {/* Main Game Container */}
-      <main className="max-w-6xl mx-auto px-4 py-8">
-        <div className="relative game-container">
-          {/* Glow effect behind the emulator */}
-          <div className="absolute -inset-4 bg-gradient-to-r from-red-500/20 via-yellow-500/20 to-green-500/20 blur-xl rounded-3xl" />
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files;
+        if (files && files.length > 0) {
+            handleFileDrop(files[0]);
+        }
+    };
 
-          {/* Emulator frame */}
-          <div className="relative bg-gradient-to-b from-[#2a2a4a] to-[#1a1a3a] rounded-2xl p-3 shadow-2xl border border-[#3a3a5a]">
-            {/* Inner bezel */}
-            <div className="bg-[#0f0f23] rounded-xl overflow-hidden shadow-inner">
-              {/* Power LED and ROM info */}
-              <div className="flex items-center gap-2 px-4 py-2 bg-[#0a0a1a] border-b border-[#1a1a3a]">
-                <div 
-                  className={`w-2 h-2 rounded-full transition-all ${
-                    gameStarted 
-                      ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)] animate-pulse" 
-                      : romUrl 
-                        ? "bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.6)]"
-                        : "bg-gray-600"
-                  }`} 
+    return (
+        <div className="min-h-screen bg-[#0a0a1a] font-mono">
+            {/* Scanline overlay */}
+            <div className="pointer-events-none fixed inset-0 z-50 opacity-[0.03]">
+                <div
+                    className="h-full w-full"
+                    style={{
+                        backgroundImage:
+                            'repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(0,0,0,0.3) 1px, rgba(0,0,0,0.3) 2px)',
+                    }}
                 />
-                <span className="text-[10px] text-[#4a4a7a] uppercase tracking-widest">
-                  {gameStarted ? "Running" : romUrl ? "Ready" : "No ROM"}
-                </span>
-                {romUrl && (
-                  <button
-                    type="button"
-                    onClick={handleClearRom}
-                    className="ml-auto text-[10px] text-red-400/70 hover:text-red-400 transition-colors"
-                  >
-                    ✕ Eject ROM
-                  </button>
-                )}
-              </div>
+            </div>
 
-              {/* Game screen or Drop Zone */}
-              <div className="aspect-[4/3] w-full">
-                {romUrl ? (
-                  <GameEmulator 
-                    ref={emulatorRef}
-                    gameUrl={romUrl}
-                    onReady={handleGameReady}
-                  />
-                ) : (
-                  <label
-                    htmlFor="rom-file-input"
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                    className={`w-full h-full flex flex-col items-center justify-center transition-all duration-300 cursor-pointer ${
-                      isDragging 
-                        ? "bg-yellow-500/10 border-2 border-dashed border-yellow-400" 
-                        : "bg-[#0f0f23] hover:bg-[#151530]"
-                    }`}
-                  >
-                    <input
-                      id="rom-file-input"
-                      type="file"
-                      accept=".smc,.sfc,.fig,.swc,.bs,.st"
-                      onChange={handleFileSelect}
-                      className="hidden"
-                    />
-                    <div className="text-center p-8 pointer-events-none">
-                      <div className={`text-6xl mb-4 transition-transform duration-300 ${isDragging ? 'scale-125' : ''}`}>
-                        {isDragging ? "📥" : "🎮"}
-                      </div>
-                      <h2 className="text-xl font-bold text-[#cacafa] mb-2">
-                        {isDragging ? "Drop ROM here!" : "Drop a SNES ROM to play"}
-                      </h2>
-                      <p className="text-sm text-[#6a6a9a] mb-4">
-                        Supported formats: .smc, .sfc, .fig, .swc
-                      </p>
-                      <span className="inline-block px-6 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-500 hover:to-blue-500 transition-all text-sm font-bold pointer-events-auto">
-                        Click or drop file to load
-                      </span>
-                      <p className="text-[10px] text-[#4a4a6a] mt-4">
-                        Your ROM files are processed locally and never uploaded
-                      </p>
+            {/* Header */}
+            <header className="relative border-[#2a2a4a] border-b bg-gradient-to-b from-[#1a1a3a] to-[#0f0f23]">
+                <div className="mx-auto max-w-6xl px-6 py-8">
+                    <div className="flex flex-col items-center gap-2">
+                        <div className="flex items-center gap-3">
+                            <span className="text-3xl">🎮</span>
+                            <h1 className="font-bold text-2xl tracking-tight md:text-4xl">
+                                <span className="bg-gradient-to-r from-red-500 via-yellow-400 to-green-400 bg-clip-text text-transparent">
+                                    Hurmuzi
+                                </span>
+                            </h1>
+                            <span className="text-3xl">🕹️</span>
+                        </div>
+                        <p className="text-[#6a6a9a] text-sm uppercase tracking-widest">
+                            Play SNES games in your browser
+                        </p>
                     </div>
-                  </label>
-                )}
-              </div>
-            </div>
-          </div>
+                </div>
+
+                {/* Decorative pixels */}
+                <div className="absolute top-4 left-4 flex gap-1 opacity-50">
+                    <div className="h-2 w-2 bg-red-500" />
+                    <div className="h-2 w-2 bg-yellow-400" />
+                    <div className="h-2 w-2 bg-green-500" />
+                </div>
+                <div className="absolute top-4 right-4 flex gap-1 opacity-50">
+                    <div className="h-2 w-2 bg-green-500" />
+                    <div className="h-2 w-2 bg-yellow-400" />
+                    <div className="h-2 w-2 bg-red-500" />
+                </div>
+            </header>
+
+            {/* Main Content */}
+            <main className="mx-auto max-w-4xl px-4 py-12">
+                <div className="relative">
+                    {/* Glow effect */}
+                    <div className="-inset-4 absolute rounded-3xl bg-gradient-to-r from-red-500/20 via-yellow-500/20 to-green-500/20 blur-xl" />
+
+                    {/* Selection Card */}
+                    <div className="relative rounded-2xl border border-[#3a3a5a] bg-gradient-to-b from-[#2a2a4a] to-[#1a1a3a] p-6 shadow-2xl">
+                        <div className="overflow-hidden rounded-xl bg-[#0f0f23] shadow-inner">
+                            {/* URL Input Section */}
+                            <div className="border-[#2a2a4a] border-b bg-[#0a0a1a] p-6">
+                                <form onSubmit={handleUrlSubmit}>
+                                    <label
+                                        htmlFor="rom-url-input"
+                                        className="mb-3 block font-bold text-cyan-400 text-lg"
+                                    >
+                                        🌐 Load ROM from URL
+                                    </label>
+                                    <div className="flex gap-3">
+                                        <input
+                                            id="rom-url-input"
+                                            name="rom-url"
+                                            type="url"
+                                            defaultValue={process.env.NEXT_PUBLIC_DEFAULT_ROM_URL}
+                                            placeholder="https://raw.githubusercontent.com/..."
+                                            className="flex-1 rounded-lg border border-[#2a2a4a] bg-[#0f0f23] px-4 py-3 text-[#cacafa] placeholder-[#4a4a6a] focus:border-cyan-400/50 focus:outline-none"
+                                        />
+                                        <button
+                                            type="submit"
+                                            className="rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-8 py-3 font-bold text-white transition-all hover:from-purple-500 hover:to-blue-500"
+                                        >
+                                            Load
+                                        </button>
+                                    </div>
+                                    <p className="mt-3 text-[#6a6a8a] text-sm">
+                                        💡 Paste a GitHub raw URL or direct ROM link
+                                    </p>
+                                </form>
+                            </div>
+
+                            {/* Divider */}
+                            <div className="flex items-center gap-4 px-6 py-4">
+                                <div className="h-px flex-1 bg-[#2a2a4a]" />
+                                <span className="text-[#4a4a6a] text-sm">OR</span>
+                                <div className="h-px flex-1 bg-[#2a2a4a]" />
+                            </div>
+
+                            {/* GitHub Repository Browser */}
+                            <div className="border-[#2a2a4a] border-b bg-[#0a0a1a] p-6">
+                                <form
+                                    onSubmit={(e) => {
+                                        e.preventDefault();
+                                        const formData = new FormData(e.currentTarget);
+                                        const repoUrl = formData.get('repo-url') as string;
+                                        if (repoUrl?.trim()) {
+                                            router.push(`/list?url=${encodeURIComponent(repoUrl)}`);
+                                        } else {
+                                            alert('Please enter a GitHub repository URL');
+                                        }
+                                    }}
+                                >
+                                    <label
+                                        htmlFor="repo-url-input"
+                                        className="mb-3 block font-bold text-green-400 text-lg"
+                                    >
+                                        📚 Browse GitHub ROM Repository
+                                    </label>
+                                    <div className="flex gap-3">
+                                        <input
+                                            id="repo-url-input"
+                                            name="repo-url"
+                                            type="url"
+                                            defaultValue={process.env.NEXT_PUBLIC_DEFAULT_REPO_URL}
+                                            placeholder="https://github.com/user/rom-collection"
+                                            className="flex-1 rounded-lg border border-[#2a2a4a] bg-[#0f0f23] px-4 py-3 text-[#cacafa] placeholder-[#4a4a6a] focus:border-green-400/50 focus:outline-none"
+                                        />
+                                        <button
+                                            type="submit"
+                                            className="rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 px-8 py-3 font-bold text-white transition-all hover:from-green-500 hover:to-emerald-500"
+                                        >
+                                            Browse
+                                        </button>
+                                    </div>
+                                    <p className="mt-3 text-[#6a6a8a] text-sm">
+                                        🗂️ View and search all compatible ROMs in a repository
+                                    </p>
+                                </form>
+                            </div>
+
+                            {/* Divider */}
+                            <div className="flex items-center gap-4 px-6 py-4">
+                                <div className="h-px flex-1 bg-[#2a2a4a]" />
+                                <span className="text-[#4a4a6a] text-sm">OR</span>
+                                <div className="h-px flex-1 bg-[#2a2a4a]" />
+                            </div>
+
+                            {/* Drag & Drop Section */}
+                            <label
+                                htmlFor="rom-file-input"
+                                onDragOver={handleDragOver}
+                                onDragLeave={handleDragLeave}
+                                onDrop={handleDrop}
+                                className={`block cursor-pointer p-12 transition-all duration-300 ${
+                                    isDragging
+                                        ? 'border-2 border-yellow-400 border-dashed bg-yellow-500/10'
+                                        : 'bg-[#0f0f23] hover:bg-[#151530]'
+                                }`}
+                            >
+                                <input
+                                    id="rom-file-input"
+                                    type="file"
+                                    accept=".smc,.sfc,.fig,.swc,.bs,.st"
+                                    onChange={handleFileSelect}
+                                    className="hidden"
+                                />
+                                <div className="pointer-events-none flex flex-col items-center gap-4 text-center">
+                                    <div
+                                        className={`text-6xl transition-transform duration-300 ${isDragging ? 'scale-125' : ''}`}
+                                    >
+                                        {isDragging ? '📥' : '📂'}
+                                    </div>
+                                    <h2 className="font-bold text-2xl text-[#cacafa]">
+                                        {isDragging ? 'Drop ROM here!' : 'Drag & Drop ROM File'}
+                                    </h2>
+                                    <p className="text-[#6a6a9a]">
+                                        Supported formats: <span className="text-cyan-400">.smc, .sfc, .fig, .swc</span>
+                                    </p>
+                                    <span className="pointer-events-auto inline-block rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-8 py-3 font-bold text-white transition-all hover:from-purple-500 hover:to-blue-500">
+                                        Or Click to Browse
+                                    </span>
+                                    <p className="text-[#4a4a6a] text-sm">
+                                        🔒 Your files are processed locally - never uploaded
+                                    </p>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Info Section */}
+                <div className="mt-8 grid gap-4 md:grid-cols-2">
+                    <div className="rounded-xl border border-[#2a2a4a] bg-[#1a1a3a]/50 p-5">
+                        <h3 className="mb-3 flex items-center gap-2 font-bold text-yellow-400">
+                            <span>⚡</span> Features
+                        </h3>
+                        <ul className="space-y-2 text-[#8a8aba] text-sm">
+                            <li className="flex items-start gap-2">
+                                <span className="text-green-400">✓</span>
+                                Full SNES emulation in browser
+                            </li>
+                            <li className="flex items-start gap-2">
+                                <span className="text-green-400">✓</span>
+                                8-channel audio mixer
+                            </li>
+                            <li className="flex items-start gap-2">
+                                <span className="text-green-400">✓</span>
+                                Save/load game states
+                            </li>
+                            <li className="flex items-start gap-2">
+                                <span className="text-green-400">✓</span>
+                                No installation required
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div className="rounded-xl border border-[#2a2a4a] bg-[#1a1a3a]/50 p-5">
+                        <h3 className="mb-3 flex items-center gap-2 font-bold text-cyan-400">
+                            <span>🔗</span> GitHub ROM URLs
+                        </h3>
+                        <p className="mb-2 text-[#8a8aba] text-sm">Use raw.githubusercontent.com URLs:</p>
+                        <code className="block rounded bg-[#0a0a1a] p-2 text-[#6a6a8a] text-[10px]">
+                            https://raw.githubusercontent.com/
+                            <br />
+                            owner/repo/branch/path/game.sfc
+                        </code>
+                    </div>
+                </div>
+            </main>
         </div>
-
-        {/* Controls info - only show when ROM is loaded */}
-        {romUrl && (
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Sound Channel Mixer */}
-            <SoundChannelMixer 
-              onSetVariable={handleSetVariable}
-              onReloadEmulator={handleReloadEmulator}
-              onSaveStates={handleSaveChannelStates}
-              disabled={!gameStarted}
-              coreOptions={coreOptions}
-              initialStates={savedChannelStates}
-              romName={romName}
-            />
-
-            <div className="bg-[#1a1a3a]/50 rounded-xl p-5 border border-[#2a2a4a]">
-              <h3 className="text-yellow-400 text-sm font-bold mb-3 flex items-center gap-2">
-                <span>⌨️</span> Keyboard Controls
-              </h3>
-              
-              {/* SNES Controller Layout */}
-              <div className="space-y-3">
-                {/* D-Pad */}
-                <div className="text-[10px] text-cyan-400 uppercase tracking-wider mb-1">D-Pad</div>
-                <div className="grid grid-cols-2 gap-1 text-xs">
-                  <div className="flex justify-between text-[#8a8aba]">
-                    <span>↑ ↓ ← →</span>
-                    <span className="text-[#cacafa]">Arrow Keys</span>
-                  </div>
-                </div>
-
-                {/* Face Buttons */}
-                <div className="text-[10px] text-cyan-400 uppercase tracking-wider mb-1 mt-3">Face Buttons</div>
-                <div className="grid grid-cols-2 gap-1 text-xs">
-                  <div className="flex justify-between text-[#8a8aba]">
-                    <span>A</span>
-                    <span className="text-[#cacafa]">S</span>
-                  </div>
-                  <div className="flex justify-between text-[#8a8aba]">
-                    <span>B</span>
-                    <span className="text-[#cacafa]">A</span>
-                  </div>
-                  <div className="flex justify-between text-[#8a8aba]">
-                    <span>X</span>
-                    <span className="text-[#cacafa]">W</span>
-                  </div>
-                  <div className="flex justify-between text-[#8a8aba]">
-                    <span>Y</span>
-                    <span className="text-[#cacafa]">Q</span>
-                  </div>
-                </div>
-
-                {/* Shoulder Buttons */}
-                <div className="text-[10px] text-cyan-400 uppercase tracking-wider mb-1 mt-3">Shoulder</div>
-                <div className="grid grid-cols-2 gap-1 text-xs">
-                  <div className="flex justify-between text-[#8a8aba]">
-                    <span>L</span>
-                    <span className="text-[#cacafa]">Z</span>
-                  </div>
-                  <div className="flex justify-between text-[#8a8aba]">
-                    <span>R</span>
-                    <span className="text-[#cacafa]">X</span>
-                  </div>
-                </div>
-
-                {/* Menu Buttons */}
-                <div className="text-[10px] text-cyan-400 uppercase tracking-wider mb-1 mt-3">Menu</div>
-                <div className="grid grid-cols-2 gap-1 text-xs">
-                  <div className="flex justify-between text-[#8a8aba]">
-                    <span>Start</span>
-                    <span className="text-[#cacafa]">Enter</span>
-                  </div>
-                  <div className="flex justify-between text-[#8a8aba]">
-                    <span>Select</span>
-                    <span className="text-[#cacafa]">Shift</span>
-                  </div>
-                </div>
-
-                {/* Emulator Controls */}
-                <div className="text-[10px] text-green-400 uppercase tracking-wider mb-1 mt-3">Emulator</div>
-                <div className="grid grid-cols-2 gap-1 text-xs">
-                  <div className="flex justify-between text-[#8a8aba]">
-                    <span>Fast Fwd</span>
-                    <span className="text-[#cacafa]">Space</span>
-                  </div>
-                  <div className="flex justify-between text-[#8a8aba]">
-                    <span>Save State</span>
-                    <span className="text-[#cacafa]">F2</span>
-                  </div>
-                  <div className="flex justify-between text-[#8a8aba]">
-                    <span>Load State</span>
-                    <span className="text-[#cacafa]">F4</span>
-                  </div>
-                  <div className="flex justify-between text-[#8a8aba]">
-                    <span>Fullscreen</span>
-                    <span className="text-[#cacafa]">F11</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-[#1a1a3a]/50 rounded-xl p-5 border border-[#2a2a4a]">
-              <h3 className="text-green-400 text-sm font-bold mb-3 flex items-center gap-2">
-                <span>🎯</span> Tips
-              </h3>
-              <ul className="text-xs text-[#8a8aba] space-y-2">
-                <li className="flex items-start gap-2">
-                  <span className="text-yellow-400">•</span>
-                  Click play to start the game
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-yellow-400">•</span>
-                  Use fullscreen for best experience
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-yellow-400">•</span>
-                  Progress is saved automatically
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-yellow-400">•</span>
-                  Hold Space for fast-forward
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-yellow-400">•</span>
-                  Check emulator menu for more options
-                </li>
-              </ul>
-
-              <div className="mt-4 pt-3 border-t border-[#2a2a4a]">
-                <h4 className="text-purple-400 text-xs font-bold mb-2">🎵 Sound Channel Tips</h4>
-                <ul className="text-[10px] text-[#6a6a8a] space-y-1">
-                  <li>• CH 1-4 typically carry melody/music</li>
-                  <li>• CH 5-8 often have drums/SFX</li>
-                  <li>• Mute CH 1-5 to hear just SFX</li>
-                  <li>• Your channel settings are saved per ROM</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        )}
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-[#2a2a4a] mt-12 py-6">
-        <div className="max-w-6xl mx-auto px-6 text-center">
-          <p className="text-[#4a4a7a] text-xs">
-            Powered by{" "}
-            <a
-              href="https://emulatorjs.org"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-yellow-400/80 hover:text-yellow-400 transition-colors"
-            >
-              EmulatorJS
-            </a>
-            {" • "}
-            <span className="text-[#3a3a5a]">ROM files are processed locally</span>
-          </p>
-        </div>
-      </footer>
-    </div>
-  );
+    );
 }
