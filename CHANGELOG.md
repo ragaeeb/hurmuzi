@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/ragaeeb/hurmuzi/compare/v1.0.0...v1.0.1) (2025-12-27)
+
+
+### Bug Fixes
+
+* **security:** Bump dependencies ([0864973](https://github.com/ragaeeb/hurmuzi/commit/086497323725f9c73bf9a1dad7ce7ec9dd544a86))
+
 # 1.0.0 (2025-11-28)
 
 
