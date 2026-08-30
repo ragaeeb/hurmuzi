@@ -146,6 +146,7 @@ export default function Home() {
                         <div className="hidden items-center gap-2 sm:flex">
                             <span className="font-mono text-xs text-zinc-400">Quick play:</span>
                             <select
+                                aria-label="Quick play a recent ROM"
                                 defaultValue=""
                                 onChange={(e) => {
                                     if (e.target.value) {
@@ -257,7 +258,7 @@ export default function Home() {
                                         <p className="mt-1 text-xs text-zinc-400">
                                             Supports{' '}
                                             <span className="font-medium font-mono text-cyan-300">
-                                                .sfc, .smc, .fig, .swc, .bs
+                                                {getValidRomExtensions()}
                                             </span>
                                         </p>
 

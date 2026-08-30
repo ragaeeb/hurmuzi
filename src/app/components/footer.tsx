@@ -25,7 +25,7 @@ export const Footer = () => {
                         <span className="text-zinc-600">•</span>
                         <a
                             href={versionUrl}
-                            className="font-mono text-[11px] text-zinc-500 transition-colors hover:text-zinc-300"
+                            className="font-mono text-[11px] text-zinc-400 transition-colors hover:text-zinc-300"
                             target="_blank"
                             rel="noopener noreferrer"
                         >

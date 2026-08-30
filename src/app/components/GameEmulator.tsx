@@ -159,6 +159,13 @@ const GameEmulator = forwardRef<GameEmulatorRef, GameEmulatorProps>(function Gam
 
     const reloadEmulator = useCallback(
         async (pendingSettings: Record<string, string>): Promise<void> => {
+            const previousReload = pendingReloadRef.current;
+            if (previousReload) {
+                clearTimeout(previousReload.timeout);
+                pendingReloadRef.current = null;
+                previousReload.reject(new Error('Emulator reload superseded by a newer reload'));
+            }
+
             console.log(
                 '%c🔄 FULL EMULATOR RELOAD (iframe method)',
                 'color: #00ffff; font-weight: bold; font-size: 14px',

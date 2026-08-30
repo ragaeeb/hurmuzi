@@ -136,7 +136,7 @@ export default function SoundChannelMixer({
                             }`}
                         >
                             {/* Shimmer sweep */}
-                            <div className="pointer-events-none absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                            <div className="pointer-events-none absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-white/10 to-transparent motion-reduce:animate-none" />
                             <span className="relative flex items-center justify-center gap-1.5">
                                 {isDetectingMusic ? (
                                     <>
@@ -160,7 +160,7 @@ export default function SoundChannelMixer({
                             value={sampleDurationMs}
                             onChange={(event) => setSampleDurationMs(Number(event.target.value))}
                             disabled={isDetectingMusic}
-                            className="rounded-xl border border-white/10 bg-[#16162c] px-2.5 font-mono text-xs text-zinc-300 transition-colors focus:border-purple-400/50 focus:outline-none"
+                            className="rounded-xl border border-white/10 bg-[#16162c] px-2.5 font-mono text-base text-zinc-300 transition-colors focus:border-purple-400/50 focus:outline-none sm:text-xs"
                         >
                             <option value={2000}>2s</option>
                             <option value={3000}>3s</option>
@@ -224,7 +224,7 @@ export default function SoundChannelMixer({
                                 : 'animate-pulse-glow border-cyan-400/60 bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:brightness-110'
                         }`}
                     >
-                        <div className="pointer-events-none absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+                        <div className="pointer-events-none absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-white/20 to-transparent motion-reduce:animate-none" />
                         <span className="relative flex items-center justify-center gap-2">
                             {isApplying ? (
                                 <>
@@ -273,7 +273,7 @@ export default function SoundChannelMixer({
                                         value={opt.currentValue}
                                         onChange={(e) => handleAudioOptionChange(opt.key, e.target.value)}
                                         disabled={isDetectingMusic}
-                                        className="rounded-lg border border-white/10 bg-[#0d0d1b] px-2 py-1 font-mono text-[10px] text-zinc-200 focus:border-cyan-400/50 focus:outline-none"
+                                        className="rounded-lg border border-white/10 bg-[#0d0d1b] px-2 py-1 font-mono text-base text-zinc-200 focus:border-cyan-400/50 focus:outline-none sm:text-[10px]"
                                     >
                                         {opt.values.map((val) => (
                                             <option key={val} value={val}>

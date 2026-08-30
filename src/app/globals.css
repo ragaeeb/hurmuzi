@@ -100,6 +100,17 @@ body {
     animation: pulse-glow 2s ease-in-out infinite;
 }
 
+@media (prefers-reduced-motion: reduce) {
+    .animate-shimmer,
+    .animate-eq-1,
+    .animate-eq-2,
+    .animate-eq-3,
+    .animate-eq-4,
+    .animate-pulse-glow {
+        animation: none;
+    }
+}
+
 /* Sleek dark scrollbar */
 ::-webkit-scrollbar {
     width: 6px;

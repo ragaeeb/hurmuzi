@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { isValidRomFile } from '@/lib/emulator/utils';
 import { normalizeRemoteRomSource } from '@/lib/storage/roms';
 
@@ -51,7 +51,18 @@ function RomListContent() {
 
     // Virtual scrolling state
     const [scrollTop, setScrollTop] = useState(0);
-    const containerRef = useRef<HTMLDivElement>(null);
+    const [viewportHeight, setViewportHeight] = useState(0);
+    const [scrollContainer, setScrollContainer] = useState<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+        if (!scrollContainer) {
+            return;
+        }
+
+        const observer = new ResizeObserver(([entry]) => setViewportHeight(entry.contentRect.height));
+        observer.observe(scrollContainer);
+        return () => observer.disconnect();
+    }, [scrollContainer]);
 
     // Fetch ROMs from GitHub API
     useEffect(() => {
@@ -115,8 +126,8 @@ function RomListContent() {
         setFilteredRoms(filtered);
 
         // Reset scroll to top when filtering
-        if (containerRef.current) {
-            containerRef.current.scrollTop = 0;
+        if (scrollContainer) {
+            scrollContainer.scrollTop = 0;
         }
     };
 
@@ -143,10 +154,10 @@ function RomListContent() {
         const startIndex = Math.max(0, Math.floor(scrollTop / ITEM_HEIGHT) - VIEWPORT_BUFFER);
         const endIndex = Math.min(
             filteredRoms.length - 1,
-            Math.ceil((scrollTop + (containerRef.current?.clientHeight || 600)) / ITEM_HEIGHT) + VIEWPORT_BUFFER,
+            Math.ceil((scrollTop + (viewportHeight || 600)) / ITEM_HEIGHT) + VIEWPORT_BUFFER,
         );
         return { endIndex, startIndex };
-    }, [scrollTop, filteredRoms.length]);
+    }, [scrollTop, filteredRoms.length, viewportHeight]);
 
     const visibleRoms = useMemo(() => {
         return filteredRoms.slice(visibleRange.startIndex, visibleRange.endIndex + 1);
@@ -242,7 +253,7 @@ function RomListContent() {
                         <>
                             {/* ROM List with Virtual Scrolling */}
                             <div
-                                ref={containerRef}
+                                ref={setScrollContainer}
                                 onScroll={handleScroll}
                                 className="relative h-[calc(100vh-12rem)] min-h-[380px] overflow-y-auto rounded-2xl border border-white/10 bg-[#0c0c1e] shadow-inner"
                             >

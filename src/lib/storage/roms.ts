@@ -3,6 +3,9 @@ import { isValidRomFile } from '@/lib/emulator/utils';
 const ROMS_DIRECTORY = 'roms';
 const LOCAL_DIRECTORY = 'local';
 const REMOTE_DIRECTORY = 'remote';
+const MAX_ROM_SIZE_BYTES = 16 * 1024 * 1024;
+const MAX_GITHUB_RESPONSE_SIZE_BYTES = 23 * 1024 * 1024;
+const ROM_DOWNLOAD_TIMEOUT_MS = 30000;
 
 interface OpfsStorageManager extends StorageManager {
     getDirectory(): Promise<FileSystemDirectoryHandle>;
@@ -44,9 +47,19 @@ async function writeFile(directory: FileSystemDirectoryHandle, name: string, blo
     await writable.close();
 }
 
-async function sourceHash(source: string): Promise<string> {
-    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(source));
+async function sha256(value: BufferSource): Promise<string> {
+    const digest = await crypto.subtle.digest('SHA-256', value);
     return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function sourceHash(source: string): Promise<string> {
+    return sha256(new TextEncoder().encode(source));
+}
+
+function assertRomSize(size: number): void {
+    if (size > MAX_ROM_SIZE_BYTES) {
+        throw new Error('ROM download exceeds the 16 MB size limit');
+    }
 }
 
 function safeFilename(name: string): string {
@@ -92,7 +105,7 @@ export function getRomNameFromSource(source: string): string {
 
 export async function saveLocalRom(file: File): Promise<string> {
     const name = safeFilename(file.name);
-    const id = crypto.randomUUID();
+    const id = await sha256(await file.arrayBuffer());
     const directory = await getDirectory([ROMS_DIRECTORY, LOCAL_DIRECTORY, id], true);
     await writeFile(directory, name, file);
     return `opfs:/${ROMS_DIRECTORY}/${LOCAL_DIRECTORY}/${id}/${encodeURIComponent(name)}`;
@@ -177,22 +190,32 @@ async function cacheRemoteRom(source: string, name: string, blob: Blob): Promise
 
 async function downloadRemoteRom(source: string): Promise<{ blob: Blob; name: string }> {
     const url = new URL(source);
-    const response = await fetch(source);
+    const isGitHubApiBlob = url.hostname === 'api.github.com' && url.pathname.includes('/git/blobs/');
+    const response = await fetch(source, { signal: AbortSignal.timeout(ROM_DOWNLOAD_TIMEOUT_MS) });
     if (!response.ok) {
         throw new Error(`Failed to download ROM: ${response.status} ${response.statusText}`);
     }
 
-    if (url.hostname === 'api.github.com' && url.pathname.includes('/git/blobs/')) {
+    const contentLength = Number(response.headers.get('content-length') || 0);
+    const maxResponseSize = isGitHubApiBlob ? MAX_GITHUB_RESPONSE_SIZE_BYTES : MAX_ROM_SIZE_BYTES;
+    if (contentLength > maxResponseSize) {
+        throw new Error('ROM download exceeds the 16 MB size limit');
+    }
+
+    if (isGitHubApiBlob) {
         const data = await response.json();
         if (!data.content || data.encoding !== 'base64') {
             throw new Error('Unexpected GitHub API response format');
         }
         const binary = atob(data.content.replace(/\s/g, ''));
         const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+        assertRomSize(bytes.byteLength);
         return { blob: new Blob([bytes], { type: 'application/octet-stream' }), name: 'game.sfc' };
     }
 
-    return { blob: await response.blob(), name: getRomNameFromSource(source) };
+    const blob = await response.blob();
+    assertRomSize(blob.size);
+    return { blob, name: getRomNameFromSource(source) };
 }
 
 export async function loadRomSource(value: string): Promise<LoadedRom> {

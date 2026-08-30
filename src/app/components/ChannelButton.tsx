@@ -91,7 +91,9 @@ export default function ChannelButton({
 
                 {/* Pending reload indicator */}
                 {needsReloadForThis && !disabled && (
-                    <div className="absolute top-1 left-1 animate-pulse font-mono text-[9px] text-amber-400">⏳</div>
+                    <div className="absolute top-1 left-1 font-mono text-[9px] text-amber-400 motion-safe:animate-pulse">
+                        ⏳
+                    </div>
                 )}
 
                 {/* Music detected icon badge */}
