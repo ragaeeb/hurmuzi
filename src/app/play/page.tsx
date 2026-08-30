@@ -3,19 +3,20 @@
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { measureCurrentChannelActivity } from '@/lib/emulator/musicDetection';
+import type { MusicDetectionResult } from '@/lib/emulator/types';
 import { getSavedChannelStates, saveChannelStates } from '@/lib/storage/channelStates';
+import { loadRomSource } from '@/lib/storage/roms';
 import type { CoreOption, GameEmulatorRef } from '../components/GameEmulator';
 import SoundChannelMixer from '../components/SoundChannelMixer';
 
 const GameEmulator = dynamic(() => import('../components/GameEmulator'), {
     loading: () => (
-        <div className="flex h-full min-h-[480px] items-center justify-center bg-[#0f0f23]">
-            <div className="flex flex-col items-center gap-4">
-                <div className="h-12 w-12 animate-spin rounded-full border-4 border-yellow-400 border-t-transparent" />
-                <span className="animate-pulse font-mono text-sm text-yellow-400 tracking-wider">
-                    Loading Emulator...
-                </span>
+        <div className="flex h-full min-h-[480px] w-full items-center justify-center bg-[#0c0c1e]">
+            <div className="flex flex-col items-center gap-3">
+                <div className="h-10 w-10 animate-spin rounded-full border-3 border-cyan-400 border-t-transparent" />
+                <span className="font-mono text-cyan-400 text-xs tracking-wider">Initializing Core...</span>
             </div>
         </div>
     ),
@@ -29,26 +30,54 @@ function PlayContent() {
     const [gameStarted, setGameStarted] = useState(false);
     const [coreOptions, setCoreOptions] = useState<CoreOption[]>([]);
     const [savedChannelStates, setSavedChannelStates] = useState<boolean[] | null>(null);
-    const [romUrl, setRomUrl] = useState<string | null>(null);
+    const [romError, setRomError] = useState<string | null>(null);
+    const [romLoading, setRomLoading] = useState(true);
+    const [romSource, setRomSource] = useState('');
+    const [romBlob, setRomBlob] = useState<Blob | null>(null);
     const [romName, setRomName] = useState<string>('Unknown Game');
+    const source = searchParams.get('source');
 
-    // Load ROM data from sessionStorage on mount
     useEffect(() => {
-        const storedRomData = sessionStorage.getItem('romData');
-        const storedRomName = sessionStorage.getItem('romName') || searchParams.get('name') || 'Unknown Game';
+        let cancelled = false;
+        setGameStarted(false);
+        setCoreOptions([]);
+        setSavedChannelStates(null);
+        setRomSource('');
+        setRomBlob(null);
+        setRomError(null);
+        setRomLoading(Boolean(source));
 
-        if (storedRomData) {
-            setRomUrl(storedRomData);
-            setRomName(storedRomName);
-
-            // Load saved channel states
-            const saved = getSavedChannelStates(storedRomName);
-            if (saved) {
-                console.log(`📂 Found saved channel states for "${storedRomName}":`, saved);
-                setSavedChannelStates(saved);
-            }
+        if (!source) {
+            return;
         }
-    }, [searchParams]);
+
+        loadRomSource(source)
+            .then((rom) => {
+                if (cancelled) {
+                    return;
+                }
+
+                setRomBlob(rom.blob);
+                setRomName(rom.name);
+                setRomSource(rom.source);
+                setSavedChannelStates(getSavedChannelStates(rom.source));
+            })
+            .catch((error) => {
+                if (!cancelled) {
+                    console.error('Failed to load ROM:', error);
+                    setRomError(error instanceof Error ? error.message : 'Failed to load ROM');
+                }
+            })
+            .finally(() => {
+                if (!cancelled) {
+                    setRomLoading(false);
+                }
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [source]);
 
     const handleGameReady = (options: CoreOption[]) => {
         setGameStarted(true);
@@ -70,10 +99,28 @@ function PlayContent() {
     };
 
     const handleSaveChannelStates = (states: boolean[]) => {
-        if (romName) {
-            saveChannelStates(romName, states);
+        if (romSource) {
+            saveChannelStates(romSource, states);
         }
     };
+
+    const handleDetectMusic = useCallback(
+        async (durationMs: number, onProgress: (percent: number) => void): Promise<MusicDetectionResult[]> => {
+            const emulator = emulatorRef.current;
+            if (!emulator) {
+                throw new Error('The emulator is not ready');
+            }
+
+            const results = await measureCurrentChannelActivity(() => emulator.getState(), durationMs, onProgress);
+
+            if (results.every((result) => result.maxLevel === 0)) {
+                throw new Error('No audio detected. Try again while music is playing and the emulator is unmuted.');
+            }
+
+            return results;
+        },
+        [],
+    );
 
     // Prevent arrow keys from scrolling
     useEffect(() => {
@@ -97,16 +144,22 @@ function PlayContent() {
         };
     }, []);
 
-    if (!romUrl) {
+    if (!romBlob) {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-[#0a0a1a]">
-                <div className="text-center">
-                    <h1 className="mb-4 text-2xl text-red-400">No ROM loaded</h1>
+            <div className="flex min-h-screen items-center justify-center bg-[#070712] px-4">
+                <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-[#0f0f24] p-8 text-center shadow-2xl">
+                    <div className="mb-4 text-4xl">{romLoading ? '⏳' : '⚠️'}</div>
+                    <h1 className="mb-2 font-semibold text-lg text-zinc-100">
+                        {romLoading ? 'Loading ROM…' : romError || 'No ROM loaded'}
+                    </h1>
+                    <p className="mb-6 text-xs text-zinc-400">
+                        {romLoading ? 'Retrieving and verifying game data...' : 'Could not launch the requested game.'}
+                    </p>
                     <Link
                         href="/"
-                        className="inline-block rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 font-bold text-white transition-all hover:from-purple-500 hover:to-blue-500"
+                        className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-2.5 font-semibold text-white text-xs shadow-[0_0_15px_rgba(99,102,241,0.3)] transition-all duration-200 hover:shadow-[0_0_25px_rgba(99,102,241,0.5)] active:scale-95"
                     >
-                        ← Back to Home
+                        <span>← Back to Home</span>
                     </Link>
                 </div>
             </div>
@@ -114,49 +167,52 @@ function PlayContent() {
     }
 
     return (
-        <div className="min-h-screen bg-[#0a0a1a] font-mono">
+        <div className="flex min-h-screen flex-col bg-[#070712]">
             {/* Scanline overlay */}
-            <div className="pointer-events-none fixed inset-0 z-50 opacity-[0.03]">
+            <div className="pointer-events-none fixed inset-0 z-50 opacity-[0.02]">
                 <div
                     className="h-full w-full"
                     style={{
                         backgroundImage:
-                            'repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(0,0,0,0.3) 1px, rgba(0,0,0,0.3) 2px)',
+                            'repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(0,0,0,0.4) 1px, rgba(0,0,0,0.4) 2px)',
                     }}
                 />
             </div>
 
-            {/* Header */}
-            <header className="relative border-[#2a2a4a] border-b bg-gradient-to-b from-[#1a1a3a] to-[#0f0f23]">
-                <div className="mx-auto max-w-6xl px-6 py-4">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <Link
-                                href="/"
-                                className="rounded-lg bg-[#2a2a4a] px-3 py-2 text-cyan-400 text-sm transition-colors hover:bg-[#3a3a5a]"
-                            >
-                                ← Back
-                            </Link>
-                            <div className="flex items-center gap-2">
-                                <span className="text-2xl">🎮</span>
-                                <h1 className="font-bold text-[#cacafa] text-lg tracking-tight md:text-xl">
-                                    {romName}
-                                </h1>
-                            </div>
+            {/* Top Bar Header */}
+            <header className="sticky top-0 z-40 w-full border-white/10 border-b bg-[#090918]/80 backdrop-blur-md">
+                <div className="flex w-full items-center justify-between px-4 py-2.5 md:px-8">
+                    <div className="flex min-w-0 items-center gap-3">
+                        <Link
+                            href="/"
+                            className="group flex items-center gap-1.5 rounded-lg border border-white/10 bg-[#121226] px-3 py-1.5 font-medium text-xs text-zinc-300 transition-all duration-150 hover:border-white/20 hover:bg-[#181832] hover:text-white active:scale-95"
+                        >
+                            <span>←</span>
+                            <span>Home</span>
+                        </Link>
+
+                        <div className="flex items-center gap-2 truncate">
+                            <span className="text-base">🎮</span>
+                            <h1 className="truncate font-semibold text-sm text-zinc-100 md:text-base">{romName}</h1>
                         </div>
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-2">
                         <div
-                            className={`flex items-center gap-2 rounded-full px-3 py-1 ${
-                                gameStarted ? 'bg-green-500/20' : 'bg-yellow-500/20'
+                            className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                                gameStarted
+                                    ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-300'
+                                    : 'border-amber-500/30 bg-amber-500/15 text-amber-300'
                             }`}
                         >
-                            <div
+                            <span
                                 className={`h-2 w-2 rounded-full ${
                                     gameStarted
-                                        ? 'animate-pulse bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]'
-                                        : 'bg-yellow-500'
+                                        ? 'animate-pulse bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]'
+                                        : 'bg-amber-400'
                                 }`}
                             />
-                            <span className="text-[#cacafa] text-xs uppercase tracking-wider">
+                            <span className="font-medium font-mono text-[10px] uppercase tracking-wider">
                                 {gameStarted ? 'Running' : 'Loading'}
                             </span>
                         </div>
@@ -164,153 +220,136 @@ function PlayContent() {
                 </div>
             </header>
 
-            {/* Main Game Container */}
-            <main className="mx-auto max-w-6xl px-4 py-8">
-                <div className="game-container relative">
-                    {/* Glow effect */}
-                    <div className="-inset-4 absolute rounded-3xl bg-gradient-to-r from-red-500/20 via-yellow-500/20 to-green-500/20 blur-xl" />
-
-                    {/* Emulator frame */}
-                    <div className="relative rounded-2xl border border-[#3a3a5a] bg-gradient-to-b from-[#2a2a4a] to-[#1a1a3a] p-3 shadow-2xl">
-                        <div className="overflow-hidden rounded-xl bg-[#0f0f23] shadow-inner">
-                            <div className="aspect-[4/3] w-full">
-                                <GameEmulator ref={emulatorRef} gameUrl={romUrl} onReady={handleGameReady} />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Controls info */}
-                <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <SoundChannelMixer
-                        onSetVariable={handleSetVariable}
-                        onReloadEmulator={handleReloadEmulator}
-                        onSaveStates={handleSaveChannelStates}
-                        disabled={!gameStarted}
-                        coreOptions={coreOptions}
-                        initialStates={savedChannelStates}
-                        romName={romName}
-                    />
-
-                    <div className="rounded-xl border border-[#2a2a4a] bg-[#1a1a3a]/50 p-5">
-                        <h3 className="mb-3 flex items-center gap-2 font-bold text-sm text-yellow-400">
-                            <span>⌨️</span> Keyboard Controls
-                        </h3>
-
-                        <div className="space-y-3">
-                            <div className="mb-1 text-[10px] text-cyan-400 uppercase tracking-wider">D-Pad</div>
-                            <div className="grid grid-cols-2 gap-1 text-xs">
-                                <div className="flex justify-between text-[#8a8aba]">
-                                    <span>↑ ↓ ← →</span>
-                                    <span className="text-[#cacafa]">Arrow Keys</span>
-                                </div>
-                            </div>
-
-                            <div className="mt-3 mb-1 text-[10px] text-cyan-400 uppercase tracking-wider">
-                                Face Buttons
-                            </div>
-                            <div className="grid grid-cols-2 gap-1 text-xs">
-                                <div className="flex justify-between text-[#8a8aba]">
-                                    <span>A</span>
-                                    <span className="text-[#cacafa]">S</span>
-                                </div>
-                                <div className="flex justify-between text-[#8a8aba]">
-                                    <span>B</span>
-                                    <span className="text-[#cacafa]">A</span>
-                                </div>
-                                <div className="flex justify-between text-[#8a8aba]">
-                                    <span>X</span>
-                                    <span className="text-[#cacafa]">W</span>
-                                </div>
-                                <div className="flex justify-between text-[#8a8aba]">
-                                    <span>Y</span>
-                                    <span className="text-[#cacafa]">Q</span>
-                                </div>
-                            </div>
-
-                            <div className="mt-3 mb-1 text-[10px] text-cyan-400 uppercase tracking-wider">Shoulder</div>
-                            <div className="grid grid-cols-2 gap-1 text-xs">
-                                <div className="flex justify-between text-[#8a8aba]">
-                                    <span>L</span>
-                                    <span className="text-[#cacafa]">Z</span>
-                                </div>
-                                <div className="flex justify-between text-[#8a8aba]">
-                                    <span>R</span>
-                                    <span className="text-[#cacafa]">X</span>
-                                </div>
-                            </div>
-
-                            <div className="mt-3 mb-1 text-[10px] text-cyan-400 uppercase tracking-wider">Menu</div>
-                            <div className="grid grid-cols-2 gap-1 text-xs">
-                                <div className="flex justify-between text-[#8a8aba]">
-                                    <span>Start</span>
-                                    <span className="text-[#cacafa]">Enter</span>
-                                </div>
-                                <div className="flex justify-between text-[#8a8aba]">
-                                    <span>Select</span>
-                                    <span className="text-[#cacafa]">Shift</span>
-                                </div>
-                            </div>
-
-                            <div className="mt-3 mb-1 text-[10px] text-green-400 uppercase tracking-wider">
-                                Emulator
-                            </div>
-                            <div className="grid grid-cols-2 gap-1 text-xs">
-                                <div className="flex justify-between text-[#8a8aba]">
-                                    <span>Fast Fwd</span>
-                                    <span className="text-[#cacafa]">Space</span>
-                                </div>
-                                <div className="flex justify-between text-[#8a8aba]">
-                                    <span>Save State</span>
-                                    <span className="text-[#cacafa]">F2</span>
-                                </div>
-                                <div className="flex justify-between text-[#8a8aba]">
-                                    <span>Load State</span>
-                                    <span className="text-[#cacafa]">F4</span>
-                                </div>
-                                <div className="flex justify-between text-[#8a8aba]">
-                                    <span>Fullscreen</span>
-                                    <span className="text-[#cacafa]">F11</span>
-                                </div>
+            {/* Main Game Workspace (Full-Width Responsive Dashboard) */}
+            <main className="w-full flex-1 px-4 py-4 md:px-8">
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+                    {/* Left/Center Column: Game Screen Area */}
+                    <div className="flex flex-col gap-4 lg:col-span-8 xl:col-span-8">
+                        <div className="game-container relative w-full overflow-hidden rounded-2xl border border-white/10 bg-[#0a0a1a] shadow-2xl">
+                            {/* Emulator Container */}
+                            <div className="relative aspect-[4/3] w-full bg-[#05050d]">
+                                <GameEmulator
+                                    key={romSource}
+                                    ref={emulatorRef}
+                                    game={romBlob}
+                                    onReady={handleGameReady}
+                                />
                             </div>
                         </div>
                     </div>
 
-                    <div className="rounded-xl border border-[#2a2a4a] bg-[#1a1a3a]/50 p-5">
-                        <h3 className="mb-3 flex items-center gap-2 font-bold text-green-400 text-sm">
-                            <span>🎯</span> Tips
-                        </h3>
-                        <ul className="space-y-2 text-[#8a8aba] text-xs">
-                            <li className="flex items-start gap-2">
-                                <span className="text-yellow-400">•</span>
-                                Game auto-starts when loaded
-                            </li>
-                            <li className="flex items-start gap-2">
-                                <span className="text-yellow-400">•</span>
-                                Use fullscreen for best experience
-                            </li>
-                            <li className="flex items-start gap-2">
-                                <span className="text-yellow-400">•</span>
-                                Progress is saved automatically
-                            </li>
-                            <li className="flex items-start gap-2">
-                                <span className="text-yellow-400">•</span>
-                                Hold Space for fast-forward
-                            </li>
-                            <li className="flex items-start gap-2">
-                                <span className="text-yellow-400">•</span>
-                                Check emulator menu for more options
-                            </li>
-                        </ul>
+                    {/* Right Column: Audio Mixer & Quick Controls */}
+                    <div className="flex flex-col gap-4 lg:col-span-4 xl:col-span-4">
+                        <SoundChannelMixer
+                            key={romSource}
+                            onDetectMusic={handleDetectMusic}
+                            onSetVariable={handleSetVariable}
+                            onReloadEmulator={handleReloadEmulator}
+                            onSaveStates={handleSaveChannelStates}
+                            disabled={!gameStarted}
+                            coreOptions={coreOptions}
+                            initialStates={savedChannelStates}
+                            romName={romSource}
+                        />
 
-                        <div className="mt-4 border-[#2a2a4a] border-t pt-3">
-                            <h4 className="mb-2 font-bold text-purple-400 text-xs">🎵 Sound Channel Tips</h4>
-                            <ul className="space-y-1 text-[#6a6a8a] text-[10px]">
-                                <li>• CH 1-4 typically carry melody/music</li>
-                                <li>• CH 5-8 often have drums/SFX</li>
-                                <li>• Mute CH 1-5 to hear just SFX</li>
-                                <li>• Your channel settings are saved per ROM</li>
-                            </ul>
+                        {/* Compact Keyboard Controls */}
+                        <div className="rounded-2xl border border-white/10 bg-[#101024]/80 p-4 shadow-xl backdrop-blur-md">
+                            <div className="mb-3 flex items-center justify-between">
+                                <h3 className="flex items-center gap-2 font-semibold text-xs text-zinc-200 tracking-tight">
+                                    <span>⌨️</span> Keyboard Controls
+                                </h3>
+                                <span className="font-mono text-[10px] text-zinc-500">Player 1</span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div className="space-y-1.5 rounded-xl border border-white/5 bg-white/[0.02] p-2.5">
+                                    <div className="font-medium font-mono text-[10px] text-cyan-400 uppercase tracking-wider">
+                                        Movement
+                                    </div>
+                                    <div className="flex items-center justify-between text-zinc-400">
+                                        <span>D-Pad</span>
+                                        <span className="flex gap-1">
+                                            <kbd className="rounded border border-white/10 bg-zinc-800/80 px-1 py-0.5 font-mono text-[10px] text-zinc-200">
+                                                ↑
+                                            </kbd>
+                                            <kbd className="rounded border border-white/10 bg-zinc-800/80 px-1 py-0.5 font-mono text-[10px] text-zinc-200">
+                                                ↓
+                                            </kbd>
+                                            <kbd className="rounded border border-white/10 bg-zinc-800/80 px-1 py-0.5 font-mono text-[10px] text-zinc-200">
+                                                ←
+                                            </kbd>
+                                            <kbd className="rounded border border-white/10 bg-zinc-800/80 px-1 py-0.5 font-mono text-[10px] text-zinc-200">
+                                                →
+                                            </kbd>
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-zinc-400">
+                                        <span>Start / Select</span>
+                                        <span className="flex gap-1">
+                                            <kbd className="rounded border border-white/10 bg-zinc-800/80 px-1 py-0.5 font-mono text-[10px] text-zinc-200">
+                                                Enter
+                                            </kbd>
+                                            <kbd className="rounded border border-white/10 bg-zinc-800/80 px-1 py-0.5 font-mono text-[10px] text-zinc-200">
+                                                Shift
+                                            </kbd>
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1.5 rounded-xl border border-white/5 bg-white/[0.02] p-2.5">
+                                    <div className="font-medium font-mono text-[10px] text-purple-400 uppercase tracking-wider">
+                                        Buttons
+                                    </div>
+                                    <div className="flex items-center justify-between text-zinc-400">
+                                        <span>A / B</span>
+                                        <span className="flex gap-1">
+                                            <kbd className="rounded border border-white/10 bg-zinc-800/80 px-1.5 py-0.5 font-mono text-[10px] text-zinc-200">
+                                                S
+                                            </kbd>
+                                            <kbd className="rounded border border-white/10 bg-zinc-800/80 px-1.5 py-0.5 font-mono text-[10px] text-zinc-200">
+                                                A
+                                            </kbd>
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-zinc-400">
+                                        <span>X / Y</span>
+                                        <span className="flex gap-1">
+                                            <kbd className="rounded border border-white/10 bg-zinc-800/80 px-1.5 py-0.5 font-mono text-[10px] text-zinc-200">
+                                                W
+                                            </kbd>
+                                            <kbd className="rounded border border-white/10 bg-zinc-800/80 px-1.5 py-0.5 font-mono text-[10px] text-zinc-200">
+                                                Q
+                                            </kbd>
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-zinc-400">
+                                        <span>L / R</span>
+                                        <span className="flex gap-1">
+                                            <kbd className="rounded border border-white/10 bg-zinc-800/80 px-1.5 py-0.5 font-mono text-[10px] text-zinc-200">
+                                                Z
+                                            </kbd>
+                                            <kbd className="rounded border border-white/10 bg-zinc-800/80 px-1.5 py-0.5 font-mono text-[10px] text-zinc-200">
+                                                X
+                                            </kbd>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="mt-2.5 flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2 text-[11px] text-zinc-400">
+                                <span>
+                                    ⚡ Fast-Forward:{' '}
+                                    <kbd className="rounded border border-white/10 bg-zinc-800/80 px-1.5 py-0.5 font-mono text-[10px] text-zinc-200">
+                                        Space
+                                    </kbd>
+                                </span>
+                                <span>
+                                    Fullscreen:{' '}
+                                    <kbd className="rounded border border-white/10 bg-zinc-800/80 px-1.5 py-0.5 font-mono text-[10px] text-zinc-200">
+                                        F11
+                                    </kbd>
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -323,12 +362,10 @@ export default function Play() {
     return (
         <Suspense
             fallback={
-                <div className="flex min-h-screen items-center justify-center bg-[#0a0a1a]">
-                    <div className="flex flex-col items-center gap-4">
-                        <div className="h-12 w-12 animate-spin rounded-full border-4 border-yellow-400 border-t-transparent" />
-                        <span className="animate-pulse font-mono text-sm text-yellow-400 tracking-wider">
-                            Loading...
-                        </span>
+                <div className="flex min-h-screen items-center justify-center bg-[#070712]">
+                    <div className="flex flex-col items-center gap-3">
+                        <div className="h-10 w-10 animate-spin rounded-full border-3 border-cyan-400 border-t-transparent" />
+                        <span className="font-mono text-cyan-400 text-xs tracking-wider">Loading Game...</span>
                     </div>
                 </div>
             }

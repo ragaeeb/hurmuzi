@@ -6,7 +6,7 @@ import type { CoreOption, EmulatorInstance } from '@/lib/emulator/types';
 import { parseCoreOptions } from '@/lib/emulator/utils';
 
 interface GameEmulatorProps {
-    gameUrl: string;
+    game: Blob;
     core?: string;
     onReady?: (coreOptions: CoreOption[]) => void;
 }
@@ -23,7 +23,7 @@ export interface GameEmulatorRef {
 }
 
 const GameEmulator = forwardRef<GameEmulatorRef, GameEmulatorProps>(function GameEmulator(
-    { gameUrl, core = 'snes9x', onReady },
+    { game, core = 'snes9x', onReady },
     ref,
 ) {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -32,7 +32,14 @@ const GameEmulator = forwardRef<GameEmulatorRef, GameEmulatorProps>(function Gam
     const coreOptionsRef = useRef<CoreOption[]>([]);
     const pendingStateRef = useRef<Uint8Array | null>(null);
     const pendingSettingsRef = useRef<Record<string, string> | null>(null);
+    const pendingReloadRef = useRef<{
+        reject: (error: Error) => void;
+        resolve: () => void;
+        timeout: ReturnType<typeof setTimeout>;
+    } | null>(null);
     const [iframeKey, setIframeKey] = useState(0);
+    const [gameUrl, setGameUrl] = useState(() => URL.createObjectURL(game));
+    const gameUrlRef = useRef(gameUrl);
     const onReadyRef = useRef(onReady);
 
     useEffect(() => {
@@ -46,6 +53,13 @@ const GameEmulator = forwardRef<GameEmulatorRef, GameEmulatorProps>(function Gam
     const handleReady = useCallback((options: CoreOption[]) => {
         coreOptionsRef.current = options;
         onReadyRef.current?.(options);
+
+        const pendingReload = pendingReloadRef.current;
+        if (pendingReload) {
+            clearTimeout(pendingReload.timeout);
+            pendingReloadRef.current = null;
+            pendingReload.resolve();
+        }
     }, []);
 
     const { setupIframe, getEmulator: getEmulatorFromHook } = useEmulatorSetup({
@@ -145,6 +159,13 @@ const GameEmulator = forwardRef<GameEmulatorRef, GameEmulatorProps>(function Gam
 
     const reloadEmulator = useCallback(
         async (pendingSettings: Record<string, string>): Promise<void> => {
+            const previousReload = pendingReloadRef.current;
+            if (previousReload) {
+                clearTimeout(previousReload.timeout);
+                pendingReloadRef.current = null;
+                previousReload.reject(new Error('Emulator reload superseded by a newer reload'));
+            }
+
             console.log(
                 '%c🔄 FULL EMULATOR RELOAD (iframe method)',
                 'color: #00ffff; font-weight: bold; font-size: 14px',
@@ -153,10 +174,10 @@ const GameEmulator = forwardRef<GameEmulatorRef, GameEmulatorProps>(function Gam
 
             // Save current game state
             const emulator = getEmulator();
-            if (emulator?.gameManager?.getState) {
-                const savedState = emulator.gameManager.getState();
+            const savedState = emulator?.gameManager?.getState?.();
+            pendingStateRef.current = savedState ? new Uint8Array(savedState) : null;
+            if (savedState) {
                 console.log('💾 State captured:', savedState?.length, 'bytes');
-                pendingStateRef.current = savedState;
             }
 
             // Store settings to apply after reload
@@ -167,9 +188,23 @@ const GameEmulator = forwardRef<GameEmulatorRef, GameEmulatorProps>(function Gam
 
             // Destroy and recreate iframe
             console.log('🗑️ Destroying iframe...');
-            setIframeKey((k) => k + 1);
+            await new Promise<void>((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    if (pendingReloadRef.current?.timeout === timeout) {
+                        pendingReloadRef.current = null;
+                    }
+                    reject(new Error('Emulator reload timed out'));
+                }, 30000);
+
+                pendingReloadRef.current = { reject, resolve, timeout };
+                URL.revokeObjectURL(gameUrlRef.current);
+                const nextGameUrl = URL.createObjectURL(game);
+                gameUrlRef.current = nextGameUrl;
+                setGameUrl(nextGameUrl);
+                setIframeKey((k) => k + 1);
+            });
         },
-        [getEmulator],
+        [game, getEmulator],
     );
 
     useImperativeHandle(
@@ -185,6 +220,18 @@ const GameEmulator = forwardRef<GameEmulatorRef, GameEmulatorProps>(function Gam
             setVariable,
         }),
         [setVariable, getCoreOptions, refreshCoreOptions, isReady, getEmulator, reloadEmulator, getState, loadState],
+    );
+
+    useEffect(
+        () => () => {
+            const pendingReload = pendingReloadRef.current;
+            if (pendingReload) {
+                clearTimeout(pendingReload.timeout);
+                pendingReload.reject(new Error('Emulator was removed during reload'));
+            }
+            URL.revokeObjectURL(gameUrlRef.current);
+        },
+        [],
     );
 
     useEffect(() => {

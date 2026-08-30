@@ -34,6 +34,14 @@ export interface IframeWindow extends Window {
     __setupComplete?: boolean;
 }
 
+export interface MusicDetectionResult {
+    activeRatio: number;
+    averageLevel: number;
+    channel: number;
+    maxLevel: number;
+    samples: number;
+}
+
 // Sound channel types
 export interface SnesChannel {
     id: number;
