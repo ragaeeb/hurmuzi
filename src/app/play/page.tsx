@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { createPendingSettings } from '@/lib/emulator/channelState';
+import { measureCurrentChannelActivity } from '@/lib/emulator/musicDetection';
 import type { MusicDetectionResult } from '@/lib/emulator/types';
 import { getSavedChannelStates, saveChannelStates } from '@/lib/storage/channelStates';
 import { loadRomSource } from '@/lib/storage/roms';
@@ -25,13 +25,11 @@ const GameEmulator = dynamic(() => import('../components/GameEmulator'), {
     ssr: false,
 });
 
-const MUSIC_SAMPLE_MS = 5000;
-const MUSIC_STATE_SETTLE_MS = 1000;
+const MUSIC_SAMPLE_MS = 10000;
 
 function PlayContent() {
     const searchParams = useSearchParams();
     const emulatorRef = useRef<GameEmulatorRef>(null);
-    const detectingMusicRef = useRef(false);
 
     const [gameStarted, setGameStarted] = useState(false);
     const [coreOptions, setCoreOptions] = useState<CoreOption[]>([]);
@@ -88,9 +86,7 @@ function PlayContent() {
 
     const handleGameReady = (options: CoreOption[]) => {
         setGameStarted(true);
-        if (!detectingMusicRef.current) {
-            setCoreOptions(options);
-        }
+        setCoreOptions(options);
     };
 
     const handleSetVariable = (key: string, value: string): boolean => {
@@ -114,45 +110,19 @@ function PlayContent() {
     };
 
     const handleDetectMusic = useCallback(
-        async (
-            originalChannelStates: boolean[],
-            onProgress: (channel: number) => void,
-        ): Promise<MusicDetectionResult[]> => {
+        async (onProgress: (percent: number) => void): Promise<MusicDetectionResult[]> => {
             const emulator = emulatorRef.current;
-            const capturedState = emulator?.getState();
-            if (!emulator || !capturedState) {
-                throw new Error('Unable to capture the current game state');
+            if (!emulator) {
+                throw new Error('The emulator is not ready');
             }
 
-            const baselineState = new Uint8Array(capturedState);
-            const results: MusicDetectionResult[] = [];
-            detectingMusicRef.current = true;
+            const results = await measureCurrentChannelActivity(() => emulator.getState(), MUSIC_SAMPLE_MS, onProgress);
 
-            try {
-                for (let index = 0; index < 8; index++) {
-                    onProgress(index + 1);
-                    const isolatedChannels = new Array(8).fill(false);
-                    isolatedChannels[index] = true;
-                    setGameStarted(false);
-                    await emulator.reloadEmulator(createPendingSettings(isolatedChannels), baselineState);
-                    await new Promise((resolve) => setTimeout(resolve, MUSIC_STATE_SETTLE_MS));
-                    results.push({ channel: index + 1, ...(await emulator.measureAudioActivity(MUSIC_SAMPLE_MS)) });
-                }
-
-                if (results.every((result) => result.maxRms === 0)) {
-                    throw new Error('No audio detected. Try again while music is playing and the emulator is unmuted.');
-                }
-
-                return results;
-            } finally {
-                try {
-                    setGameStarted(false);
-                    await emulator.reloadEmulator(createPendingSettings(originalChannelStates), baselineState);
-                    await new Promise((resolve) => setTimeout(resolve, MUSIC_STATE_SETTLE_MS));
-                } finally {
-                    detectingMusicRef.current = false;
-                }
+            if (results.every((result) => result.maxLevel === 0)) {
+                throw new Error('No audio detected. Try again while music is playing and the emulator is unmuted.');
             }
+
+            return results;
         },
         [],
     );

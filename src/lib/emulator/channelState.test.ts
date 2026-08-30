@@ -142,9 +142,9 @@ describe('updateEffectiveStateOnSolo', () => {
 describe('findLikelyMusicChannels', () => {
     it('should return every channel active for the majority of the sample', () => {
         const result = findLikelyMusicChannels([
-            { activeRatio: 0.8, averageRms: 0.1, channel: 1, maxRms: 0.2, samples: 100 },
-            { activeRatio: 0.5, averageRms: 0.1, channel: 2, maxRms: 0.2, samples: 100 },
-            { activeRatio: 0.65, averageRms: 0.1, channel: 3, maxRms: 0.2, samples: 100 },
+            { activeRatio: 0.8, averageLevel: 0.1, channel: 1, maxLevel: 0.2, samples: 100 },
+            { activeRatio: 0.5, averageLevel: 0.1, channel: 2, maxLevel: 0.2, samples: 100 },
+            { activeRatio: 0.65, averageLevel: 0.1, channel: 3, maxLevel: 0.2, samples: 100 },
         ]);
 
         expect(result).toEqual([1, 3]);

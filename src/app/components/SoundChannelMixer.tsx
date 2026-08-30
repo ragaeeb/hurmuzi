@@ -9,10 +9,7 @@ import { getAudioOptions } from '@/lib/emulator/utils';
 import ChannelButton from './ChannelButton';
 
 interface SoundChannelMixerProps {
-    onDetectMusic?: (
-        originalChannelStates: boolean[],
-        onProgress: (channel: number) => void,
-    ) => Promise<MusicDetectionResult[]>;
+    onDetectMusic?: (onProgress: (percent: number) => void) => Promise<MusicDetectionResult[]>;
     onSetVariable: (key: string, value: string) => boolean;
     onReloadEmulator?: (pendingSettings: Record<string, string>) => Promise<void>;
     onSaveStates?: (states: boolean[]) => void;
@@ -68,19 +65,19 @@ export default function SoundChannelMixer({
         }
 
         setIsDetectingMusic(true);
-        setDetectionProgress(1);
+        setDetectionProgress(0);
         setDetectionResults([]);
         setDetectionError('');
 
         try {
-            setDetectionResults(await onDetectMusic([...effectiveAudioState], setDetectionProgress));
+            setDetectionResults(await onDetectMusic(setDetectionProgress));
         } catch (error) {
             setDetectionError(error instanceof Error ? error.message : 'Music detection failed');
         } finally {
             setIsDetectingMusic(false);
             setDetectionProgress(0);
         }
-    }, [effectiveAudioState, onDetectMusic]);
+    }, [onDetectMusic]);
 
     return (
         <div className="rounded-xl border border-[#2a2a4a] bg-[#1a1a3a]/50 p-3">
@@ -130,20 +127,21 @@ export default function SoundChannelMixer({
                     <button
                         type="button"
                         onClick={handleDetectMusic}
-                        disabled={isApplying || isDetectingMusic || needsReload || !onDetectMusic}
-                        title={needsReload ? 'Apply pending channel changes before detecting music' : undefined}
+                        disabled={isApplying || isDetectingMusic || !onDetectMusic}
                         className={`w-full rounded-lg border px-3 py-2 font-bold text-xs transition-all ${
                             isDetectingMusic
                                 ? 'cursor-wait border-purple-500/30 bg-purple-500/10 text-purple-300'
-                                : needsReload || isApplying || !onDetectMusic
+                                : isApplying || !onDetectMusic
                                   ? 'cursor-not-allowed border-[#2a2a4a] bg-[#20203a] text-[#5a5a7a]'
                                   : 'border-purple-500/40 bg-purple-500/20 text-purple-300 hover:bg-purple-500/30'
                         }`}
                     >
-                        {isDetectingMusic ? `🎧 Measuring CH ${detectionProgress}/8…` : '✨ Detect Music Channels'}
+                        {isDetectingMusic
+                            ? `🎧 Sampling current audio… ${detectionProgress}%`
+                            : '✨ Detect Music Channels'}
                     </button>
                     <p className="mt-1 text-center text-[#6a6a8a] text-[8px]">
-                        Replays the current moment once per channel • about 1 minute
+                        Samples all 8 live voices for 10 seconds • no reload
                     </p>
                 </div>
             )}

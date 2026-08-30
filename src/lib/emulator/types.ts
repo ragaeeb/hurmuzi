@@ -12,7 +12,6 @@ export interface GameManagerInstance {
     getState?: () => Uint8Array;
     loadState?: (state: Uint8Array) => void;
     restart?: () => void;
-    Module?: { AL?: { currentCtx?: { audioCtx?: AudioContext; sources?: Record<string, { gain?: GainNode }> } } };
 }
 
 export interface EmulatorInstance {
@@ -35,15 +34,12 @@ export interface IframeWindow extends Window {
     __setupComplete?: boolean;
 }
 
-export interface AudioActivityResult {
+export interface MusicDetectionResult {
     activeRatio: number;
-    averageRms: number;
-    maxRms: number;
-    samples: number;
-}
-
-export interface MusicDetectionResult extends AudioActivityResult {
+    averageLevel: number;
     channel: number;
+    maxLevel: number;
+    samples: number;
 }
 
 // Sound channel types

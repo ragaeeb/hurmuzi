@@ -2,11 +2,8 @@
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { useEmulatorSetup } from '@/hooks/useEmulatorSetup';
-import type { AudioActivityResult, CoreOption, EmulatorInstance } from '@/lib/emulator/types';
+import type { CoreOption, EmulatorInstance } from '@/lib/emulator/types';
 import { parseCoreOptions } from '@/lib/emulator/utils';
-
-const AUDIO_ACTIVE_RMS = 0.001;
-const AUDIO_SAMPLE_INTERVAL_MS = 50;
 
 interface GameEmulatorProps {
     game: Blob;
@@ -20,8 +17,7 @@ export interface GameEmulatorRef {
     isReady: () => boolean;
     getEmulator: () => EmulatorInstance | null;
     refreshCoreOptions: () => CoreOption[];
-    reloadEmulator: (pendingSettings: Record<string, string>, stateOverride?: Uint8Array | null) => Promise<void>;
-    measureAudioActivity: (durationMs?: number) => Promise<AudioActivityResult>;
+    reloadEmulator: (pendingSettings: Record<string, string>) => Promise<void>;
     getState: () => Uint8Array | null;
     loadState: (state: Uint8Array) => void;
 }
@@ -161,55 +157,8 @@ const GameEmulator = forwardRef<GameEmulatorRef, GameEmulatorProps>(function Gam
 
     const isReady = useCallback(() => emulatorReady.current, []);
 
-    const measureAudioActivity = useCallback(
-        async (durationMs = 5000): Promise<AudioActivityResult> => {
-            const audio = getEmulator()?.gameManager?.Module?.AL?.currentCtx;
-            const context = audio?.audioCtx;
-            const gains = Object.values(audio?.sources || {}).flatMap((source) =>
-                source?.gain && typeof source.gain.connect === 'function' ? [source.gain] : [],
-            );
-
-            if (!context || gains.length === 0) {
-                throw new Error('Emulator audio graph is unavailable');
-            }
-
-            await context.resume();
-
-            const analyser = context.createAnalyser();
-            analyser.fftSize = 2048;
-            const sink = context.createMediaStreamDestination();
-            const buffer = new Float32Array(analyser.fftSize);
-            analyser.connect(sink);
-            gains.forEach((gain) => gain.connect(analyser));
-
-            let active = 0;
-            let maxRms = 0;
-            let samples = 0;
-            let squaredTotal = 0;
-            const end = performance.now() + durationMs;
-
-            try {
-                while (performance.now() < end) {
-                    analyser.getFloatTimeDomainData(buffer);
-                    const rms = Math.sqrt(buffer.reduce((sum, value) => sum + value * value, 0) / buffer.length);
-                    active += Number(rms > AUDIO_ACTIVE_RMS);
-                    maxRms = Math.max(maxRms, rms);
-                    samples++;
-                    squaredTotal += rms * rms;
-                    await new Promise((resolve) => setTimeout(resolve, AUDIO_SAMPLE_INTERVAL_MS));
-                }
-            } finally {
-                gains.forEach((gain) => gain.disconnect(analyser));
-                analyser.disconnect();
-            }
-
-            return { activeRatio: active / samples, averageRms: Math.sqrt(squaredTotal / samples), maxRms, samples };
-        },
-        [getEmulator],
-    );
-
     const reloadEmulator = useCallback(
-        async (pendingSettings: Record<string, string>, stateOverride?: Uint8Array | null): Promise<void> => {
+        async (pendingSettings: Record<string, string>): Promise<void> => {
             console.log(
                 '%c🔄 FULL EMULATOR RELOAD (iframe method)',
                 'color: #00ffff; font-weight: bold; font-size: 14px',
@@ -218,7 +167,7 @@ const GameEmulator = forwardRef<GameEmulatorRef, GameEmulatorProps>(function Gam
 
             // Save current game state
             const emulator = getEmulator();
-            const savedState = stateOverride === undefined ? emulator?.gameManager?.getState?.() : stateOverride;
+            const savedState = emulator?.gameManager?.getState?.();
             pendingStateRef.current = savedState ? new Uint8Array(savedState) : null;
             if (savedState) {
                 console.log('💾 State captured:', savedState?.length, 'bytes');
@@ -259,22 +208,11 @@ const GameEmulator = forwardRef<GameEmulatorRef, GameEmulatorProps>(function Gam
             getState,
             isReady,
             loadState,
-            measureAudioActivity,
             refreshCoreOptions,
             reloadEmulator,
             setVariable,
         }),
-        [
-            setVariable,
-            getCoreOptions,
-            refreshCoreOptions,
-            isReady,
-            getEmulator,
-            reloadEmulator,
-            measureAudioActivity,
-            getState,
-            loadState,
-        ],
+        [setVariable, getCoreOptions, refreshCoreOptions, isReady, getEmulator, reloadEmulator, getState, loadState],
     );
 
     useEffect(
