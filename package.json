@@ -27,7 +27,7 @@
         "typescript": "^7.0.2"
     },
     "engines": {
-        "bun": ">=1.3.3",
+        "bun": ">=1.4.0",
         "node": ">=24.0.0"
     },
     "homepage": "https://github.com/ragaeeb/hurmuzi",
@@ -40,6 +40,7 @@
     ],
     "license": "MIT",
     "name": "hurmuzi",
+    "packageManager": "bun@1.4.0",
     "private": true,
     "repository": {
         "type": "git",
