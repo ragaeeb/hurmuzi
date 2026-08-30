@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { isValidRomFile } from '@/lib/emulator/utils';
+import { normalizeRemoteRomSource } from '@/lib/storage/roms';
 
 interface GitHubTreeItem {
     path: string;
@@ -123,46 +124,20 @@ function RomListContent() {
     };
 
     // Handle ROM selection
-    const handleRomSelect = async (rom: GitHubTreeItem) => {
+    const handleRomSelect = (rom: GitHubTreeItem) => {
         try {
-            console.log('Downloading ROM:', rom.path);
-
-            // Use the blob URL from GitHub API
-            const response = await fetch(rom.url);
-            if (!response.ok) {
-                throw new Error(`Failed to fetch ROM: ${response.status}`);
+            const repository = url && parseGitHubUrl(url);
+            if (!repository) {
+                throw new Error('Invalid GitHub URL format');
             }
-
-            const jsonData = await response.json();
-
-            if (!jsonData.content || jsonData.encoding !== 'base64') {
-                throw new Error('Unexpected GitHub API response format');
-            }
-
-            // Decode base64 to binary
-            const base64Content = jsonData.content.replace(/\s/g, '');
-            const binaryString = atob(base64Content);
-            const bytes = new Uint8Array(binaryString.length);
-            for (let i = 0; i < binaryString.length; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
-            }
-
-            const blob = new Blob([bytes], { type: 'application/octet-stream' });
-
-            console.log('✅ ROM downloaded:', rom.path, 'Size:', (blob.size / 1024 / 1024).toFixed(2), 'MB');
-
-            // Convert to data URL and navigate
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const dataUrl = e.target?.result as string;
-                sessionStorage.setItem('romData', dataUrl);
-                sessionStorage.setItem('romName', rom.path.split('/').pop() || 'game.sfc');
-                router.push(`/play?name=${encodeURIComponent(rom.path.split('/').pop() || 'game.sfc')}`);
-            };
-            reader.readAsDataURL(blob);
+            const path = rom.path.split('/').map(encodeURIComponent).join('/');
+            const source = normalizeRemoteRomSource(
+                `https://raw.githubusercontent.com/${repository.owner}/${repository.repo}/master/${path}`,
+            );
+            router.push(`/play?source=${encodeURIComponent(source)}`);
         } catch (err) {
-            console.error('Failed to download ROM:', err);
-            alert(err instanceof Error ? err.message : 'Failed to download ROM');
+            console.error('Failed to open ROM:', err);
+            alert(err instanceof Error ? err.message : 'Failed to open ROM');
         }
     };
 

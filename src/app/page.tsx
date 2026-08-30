@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { getValidRomExtensions, isValidRomFile } from '@/lib/emulator/utils';
+import { getRomNameFromSource, normalizeRemoteRomSource, saveLocalRom } from '@/lib/storage/roms';
 
 export default function Home() {
     const router = useRouter();
@@ -14,17 +15,13 @@ export default function Home() {
             return;
         }
 
-        // Convert to data URL and store in sessionStorage
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const dataUrl = e.target?.result as string;
-            // Store ROM data in sessionStorage (no URL length limits)
-            sessionStorage.setItem('romData', dataUrl);
-            sessionStorage.setItem('romName', file.name);
-            // Navigate with just the name in URL
-            router.push(`/play?name=${encodeURIComponent(file.name)}`);
-        };
-        reader.readAsDataURL(file);
+        try {
+            const source = await saveLocalRom(file);
+            router.push(`/play?source=${encodeURIComponent(source)}`);
+        } catch (error) {
+            console.error('Failed to cache local ROM:', error);
+            alert(error instanceof Error ? error.message : 'Failed to cache local ROM');
+        }
     };
 
     const handleUrlSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -39,102 +36,10 @@ export default function Home() {
         }
 
         try {
-            let downloadUrl: string;
-            let filename: string;
-            let isGitHubApiBlob = false;
-
-            // Check if it's a GitHub API blob URL
-            if (url.includes('api.github.com/repos/') && url.includes('/git/blobs/')) {
-                // GitHub API blob URL - need to fetch JSON first
-                isGitHubApiBlob = true;
-                downloadUrl = url;
-                // We'll get the filename from user or default to game.sfc
-                filename = 'game.sfc'; // Default, will be updated if we can infer
-            } else if (url.includes('raw.githubusercontent.com')) {
-                // Direct raw URL
-                downloadUrl = url;
-                const urlPath = new URL(url).pathname;
-                filename = decodeURIComponent(urlPath.split('/').pop() || 'game.sfc');
-            } else if (url.includes('github.com') && url.includes('/blob/')) {
-                // Convert github.com/user/repo/blob/branch/path to raw URL
-                const parts = url.split('/blob/');
-                if (parts.length === 2) {
-                    const [base, pathPart] = parts;
-                    downloadUrl = `${base.replace('github.com', 'raw.githubusercontent.com')}/${pathPart}`;
-                    filename = decodeURIComponent(pathPart.split('/').pop() || 'game.sfc');
-                } else {
-                    throw new Error('Invalid GitHub URL format');
-                }
-            } else {
-                // Assume it's a direct download URL
-                downloadUrl = url;
-                const urlPath = new URL(url).pathname;
-                filename = decodeURIComponent(urlPath.split('/').pop() || 'game.sfc');
-            }
-
-            console.log('📥 Downloading ROM from:', downloadUrl);
-
-            let blob: Blob;
-
-            if (isGitHubApiBlob) {
-                // Fetch the GitHub API blob response
-                const response = await fetch(downloadUrl);
-                if (!response.ok) {
-                    throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
-                }
-
-                const jsonData = await response.json();
-
-                // GitHub API returns base64 encoded content
-                if (!jsonData.content || jsonData.encoding !== 'base64') {
-                    throw new Error('Unexpected GitHub API response format');
-                }
-
-                // Decode base64 to binary
-                const base64Content = jsonData.content.replace(/\s/g, ''); // Remove whitespace
-                const binaryString = atob(base64Content);
-                const bytes = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
-                }
-
-                blob = new Blob([bytes], { type: 'application/octet-stream' });
-
-                // Prompt user for filename since API doesn't provide it
-                const userFilename = prompt('Enter ROM filename (e.g., game.sfc):', 'game.sfc');
-                if (!userFilename) {
-                    throw new Error('Filename required');
-                }
-                filename = userFilename;
-            } else {
-                // Direct download
-                const response = await fetch(downloadUrl);
-                if (!response.ok) {
-                    throw new Error(`Failed to download: ${response.status} ${response.statusText}`);
-                }
-                blob = await response.blob();
-            }
-
-            // Validate filename
-            if (!isValidRomFile(filename)) {
-                throw new Error(`Invalid file type. Must be: ${getValidRomExtensions()}`);
-            }
-
-            console.log('✅ ROM downloaded:', filename, 'Size:', (blob.size / 1024 / 1024).toFixed(2), 'MB');
-
-            // Clear form before async operation
+            const source = normalizeRemoteRomSource(url);
+            getRomNameFromSource(source);
             form.reset();
-
-            // Convert to data URL and navigate
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const dataUrl = e.target?.result as string;
-                // Store in sessionStorage
-                sessionStorage.setItem('romData', dataUrl);
-                sessionStorage.setItem('romName', filename);
-                router.push(`/play?name=${encodeURIComponent(filename)}`);
-            };
-            reader.readAsDataURL(blob);
+            router.push(`/play?source=${encodeURIComponent(source)}`);
         } catch (error) {
             console.error('Failed to load ROM from URL:', error);
             alert(error instanceof Error ? error.message : 'Failed to download ROM');
@@ -220,7 +125,7 @@ export default function Home() {
             <main className="mx-auto max-w-4xl px-4 py-12">
                 <div className="relative">
                     {/* Glow effect */}
-                    <div className="-inset-4 absolute rounded-3xl bg-gradient-to-r from-red-500/20 via-yellow-500/20 to-green-500/20 blur-xl" />
+                    <div className="absolute -inset-4 rounded-3xl bg-gradient-to-r from-red-500/20 via-yellow-500/20 to-green-500/20 blur-xl" />
 
                     {/* Selection Card */}
                     <div className="relative rounded-2xl border border-[#3a3a5a] bg-gradient-to-b from-[#2a2a4a] to-[#1a1a3a] p-6 shadow-2xl">

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { getSavedChannelStates, saveChannelStates } from '@/lib/storage/channelStates';
+import { loadRomSource } from '@/lib/storage/roms';
 import type { CoreOption, GameEmulatorRef } from '../components/GameEmulator';
 import SoundChannelMixer from '../components/SoundChannelMixer';
 
@@ -29,26 +30,61 @@ function PlayContent() {
     const [gameStarted, setGameStarted] = useState(false);
     const [coreOptions, setCoreOptions] = useState<CoreOption[]>([]);
     const [savedChannelStates, setSavedChannelStates] = useState<boolean[] | null>(null);
+    const [romError, setRomError] = useState<string | null>(null);
+    const [romLoading, setRomLoading] = useState(true);
+    const [romSource, setRomSource] = useState('');
     const [romUrl, setRomUrl] = useState<string | null>(null);
     const [romName, setRomName] = useState<string>('Unknown Game');
+    const source = searchParams.get('source');
 
-    // Load ROM data from sessionStorage on mount
     useEffect(() => {
-        const storedRomData = sessionStorage.getItem('romData');
-        const storedRomName = sessionStorage.getItem('romName') || searchParams.get('name') || 'Unknown Game';
+        let cancelled = false;
+        let objectUrl: string | null = null;
+        setGameStarted(false);
+        setCoreOptions([]);
+        setSavedChannelStates(null);
+        setRomSource('');
+        setRomUrl(null);
+        setRomError(null);
+        setRomLoading(Boolean(source));
 
-        if (storedRomData) {
-            setRomUrl(storedRomData);
-            setRomName(storedRomName);
-
-            // Load saved channel states
-            const saved = getSavedChannelStates(storedRomName);
-            if (saved) {
-                console.log(`📂 Found saved channel states for "${storedRomName}":`, saved);
-                setSavedChannelStates(saved);
-            }
+        if (!source) {
+            return;
         }
-    }, [searchParams]);
+
+        loadRomSource(source)
+            .then((rom) => {
+                objectUrl = URL.createObjectURL(rom.blob);
+                if (cancelled) {
+                    URL.revokeObjectURL(objectUrl);
+                    return;
+                }
+
+                setRomUrl(objectUrl);
+                setRomName(rom.name);
+                setRomSource(rom.source);
+                setSavedChannelStates(getSavedChannelStates(rom.source));
+                console.log(`${rom.cacheHit ? '📂 Loaded cached' : '💾 Downloaded and cached'} ROM: ${rom.name}`);
+            })
+            .catch((error) => {
+                if (!cancelled) {
+                    console.error('Failed to load ROM:', error);
+                    setRomError(error instanceof Error ? error.message : 'Failed to load ROM');
+                }
+            })
+            .finally(() => {
+                if (!cancelled) {
+                    setRomLoading(false);
+                }
+            });
+
+        return () => {
+            cancelled = true;
+            if (objectUrl) {
+                URL.revokeObjectURL(objectUrl);
+            }
+        };
+    }, [source]);
 
     const handleGameReady = (options: CoreOption[]) => {
         setGameStarted(true);
@@ -70,8 +106,8 @@ function PlayContent() {
     };
 
     const handleSaveChannelStates = (states: boolean[]) => {
-        if (romName) {
-            saveChannelStates(romName, states);
+        if (romSource) {
+            saveChannelStates(romSource, states);
         }
     };
 
@@ -101,7 +137,9 @@ function PlayContent() {
         return (
             <div className="flex min-h-screen items-center justify-center bg-[#0a0a1a]">
                 <div className="text-center">
-                    <h1 className="mb-4 text-2xl text-red-400">No ROM loaded</h1>
+                    <h1 className="mb-4 text-2xl text-red-400">
+                        {romLoading ? 'Loading ROM…' : romError || 'No ROM loaded'}
+                    </h1>
                     <Link
                         href="/"
                         className="inline-block rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 font-bold text-white transition-all hover:from-purple-500 hover:to-blue-500"
@@ -168,7 +206,7 @@ function PlayContent() {
             <main className="mx-auto max-w-6xl px-4 py-8">
                 <div className="game-container relative">
                     {/* Glow effect */}
-                    <div className="-inset-4 absolute rounded-3xl bg-gradient-to-r from-red-500/20 via-yellow-500/20 to-green-500/20 blur-xl" />
+                    <div className="absolute -inset-4 rounded-3xl bg-gradient-to-r from-red-500/20 via-yellow-500/20 to-green-500/20 blur-xl" />
 
                     {/* Emulator frame */}
                     <div className="relative rounded-2xl border border-[#3a3a5a] bg-gradient-to-b from-[#2a2a4a] to-[#1a1a3a] p-3 shadow-2xl">
@@ -189,7 +227,7 @@ function PlayContent() {
                         disabled={!gameStarted}
                         coreOptions={coreOptions}
                         initialStates={savedChannelStates}
-                        romName={romName}
+                        romName={romSource}
                     />
 
                     <div className="rounded-xl border border-[#2a2a4a] bg-[#1a1a3a]/50 p-5">
