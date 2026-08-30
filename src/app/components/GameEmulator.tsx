@@ -2,8 +2,11 @@
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { useEmulatorSetup } from '@/hooks/useEmulatorSetup';
-import type { CoreOption, EmulatorInstance } from '@/lib/emulator/types';
+import type { AudioActivityResult, CoreOption, EmulatorInstance } from '@/lib/emulator/types';
 import { parseCoreOptions } from '@/lib/emulator/utils';
+
+const AUDIO_ACTIVE_RMS = 0.001;
+const AUDIO_SAMPLE_INTERVAL_MS = 50;
 
 interface GameEmulatorProps {
     gameUrl: string;
@@ -17,7 +20,8 @@ export interface GameEmulatorRef {
     isReady: () => boolean;
     getEmulator: () => EmulatorInstance | null;
     refreshCoreOptions: () => CoreOption[];
-    reloadEmulator: (pendingSettings: Record<string, string>) => Promise<void>;
+    reloadEmulator: (pendingSettings: Record<string, string>, stateOverride?: Uint8Array | null) => Promise<void>;
+    measureAudioActivity: (durationMs?: number) => Promise<AudioActivityResult>;
     getState: () => Uint8Array | null;
     loadState: (state: Uint8Array) => void;
 }
@@ -32,6 +36,11 @@ const GameEmulator = forwardRef<GameEmulatorRef, GameEmulatorProps>(function Gam
     const coreOptionsRef = useRef<CoreOption[]>([]);
     const pendingStateRef = useRef<Uint8Array | null>(null);
     const pendingSettingsRef = useRef<Record<string, string> | null>(null);
+    const pendingReloadRef = useRef<{
+        reject: (error: Error) => void;
+        resolve: () => void;
+        timeout: ReturnType<typeof setTimeout>;
+    } | null>(null);
     const [iframeKey, setIframeKey] = useState(0);
     const onReadyRef = useRef(onReady);
 
@@ -46,6 +55,13 @@ const GameEmulator = forwardRef<GameEmulatorRef, GameEmulatorProps>(function Gam
     const handleReady = useCallback((options: CoreOption[]) => {
         coreOptionsRef.current = options;
         onReadyRef.current?.(options);
+
+        const pendingReload = pendingReloadRef.current;
+        if (pendingReload) {
+            clearTimeout(pendingReload.timeout);
+            pendingReloadRef.current = null;
+            pendingReload.resolve();
+        }
     }, []);
 
     const { setupIframe, getEmulator: getEmulatorFromHook } = useEmulatorSetup({
@@ -143,8 +159,55 @@ const GameEmulator = forwardRef<GameEmulatorRef, GameEmulatorProps>(function Gam
 
     const isReady = useCallback(() => emulatorReady.current, []);
 
+    const measureAudioActivity = useCallback(
+        async (durationMs = 5000): Promise<AudioActivityResult> => {
+            const audio = getEmulator()?.gameManager?.Module?.AL?.currentCtx;
+            const context = audio?.audioCtx;
+            const gains = Object.values(audio?.sources || {}).flatMap((source) =>
+                source?.gain && typeof source.gain.connect === 'function' ? [source.gain] : [],
+            );
+
+            if (!context || gains.length === 0) {
+                throw new Error('Emulator audio graph is unavailable');
+            }
+
+            await context.resume();
+
+            const analyser = context.createAnalyser();
+            analyser.fftSize = 2048;
+            const sink = context.createMediaStreamDestination();
+            const buffer = new Float32Array(analyser.fftSize);
+            analyser.connect(sink);
+            gains.forEach((gain) => gain.connect(analyser));
+
+            let active = 0;
+            let maxRms = 0;
+            let samples = 0;
+            let squaredTotal = 0;
+            const end = performance.now() + durationMs;
+
+            try {
+                while (performance.now() < end) {
+                    analyser.getFloatTimeDomainData(buffer);
+                    const rms = Math.sqrt(buffer.reduce((sum, value) => sum + value * value, 0) / buffer.length);
+                    active += Number(rms > AUDIO_ACTIVE_RMS);
+                    maxRms = Math.max(maxRms, rms);
+                    samples++;
+                    squaredTotal += rms * rms;
+                    await new Promise((resolve) => setTimeout(resolve, AUDIO_SAMPLE_INTERVAL_MS));
+                }
+            } finally {
+                gains.forEach((gain) => gain.disconnect(analyser));
+                analyser.disconnect();
+            }
+
+            return { activeRatio: active / samples, averageRms: Math.sqrt(squaredTotal / samples), maxRms, samples };
+        },
+        [getEmulator],
+    );
+
     const reloadEmulator = useCallback(
-        async (pendingSettings: Record<string, string>): Promise<void> => {
+        async (pendingSettings: Record<string, string>, stateOverride?: Uint8Array | null): Promise<void> => {
             console.log(
                 '%c🔄 FULL EMULATOR RELOAD (iframe method)',
                 'color: #00ffff; font-weight: bold; font-size: 14px',
@@ -153,10 +216,10 @@ const GameEmulator = forwardRef<GameEmulatorRef, GameEmulatorProps>(function Gam
 
             // Save current game state
             const emulator = getEmulator();
-            if (emulator?.gameManager?.getState) {
-                const savedState = emulator.gameManager.getState();
+            const savedState = stateOverride === undefined ? emulator?.gameManager?.getState?.() : stateOverride;
+            pendingStateRef.current = savedState ? new Uint8Array(savedState) : null;
+            if (savedState) {
                 console.log('💾 State captured:', savedState?.length, 'bytes');
-                pendingStateRef.current = savedState;
             }
 
             // Store settings to apply after reload
@@ -167,7 +230,17 @@ const GameEmulator = forwardRef<GameEmulatorRef, GameEmulatorProps>(function Gam
 
             // Destroy and recreate iframe
             console.log('🗑️ Destroying iframe...');
-            setIframeKey((k) => k + 1);
+            await new Promise<void>((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    if (pendingReloadRef.current?.timeout === timeout) {
+                        pendingReloadRef.current = null;
+                    }
+                    reject(new Error('Emulator reload timed out'));
+                }, 30000);
+
+                pendingReloadRef.current = { reject, resolve, timeout };
+                setIframeKey((k) => k + 1);
+            });
         },
         [getEmulator],
     );
@@ -180,11 +253,33 @@ const GameEmulator = forwardRef<GameEmulatorRef, GameEmulatorProps>(function Gam
             getState,
             isReady,
             loadState,
+            measureAudioActivity,
             refreshCoreOptions,
             reloadEmulator,
             setVariable,
         }),
-        [setVariable, getCoreOptions, refreshCoreOptions, isReady, getEmulator, reloadEmulator, getState, loadState],
+        [
+            setVariable,
+            getCoreOptions,
+            refreshCoreOptions,
+            isReady,
+            getEmulator,
+            reloadEmulator,
+            measureAudioActivity,
+            getState,
+            loadState,
+        ],
+    );
+
+    useEffect(
+        () => () => {
+            const pendingReload = pendingReloadRef.current;
+            if (pendingReload) {
+                clearTimeout(pendingReload.timeout);
+                pendingReload.reject(new Error('Emulator was removed during reload'));
+            }
+        },
+        [],
     );
 
     useEffect(() => {

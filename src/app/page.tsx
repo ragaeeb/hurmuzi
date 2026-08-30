@@ -91,7 +91,7 @@ export default function Home() {
 
             {/* Header */}
             <header className="relative border-[#2a2a4a] border-b bg-gradient-to-b from-[#1a1a3a] to-[#0f0f23]">
-                <div className="mx-auto max-w-6xl px-6 py-8">
+                <div className="mx-auto max-w-6xl px-6 py-4">
                     <div className="flex flex-col items-center gap-2">
                         <div className="flex items-center gap-3">
                             <span className="text-3xl">🎮</span>
@@ -122,16 +122,16 @@ export default function Home() {
             </header>
 
             {/* Main Content */}
-            <main className="mx-auto max-w-4xl px-4 py-12">
+            <main className="mx-auto max-w-4xl px-4 py-6">
                 <div className="relative">
                     {/* Glow effect */}
                     <div className="absolute -inset-4 rounded-3xl bg-gradient-to-r from-red-500/20 via-yellow-500/20 to-green-500/20 blur-xl" />
 
                     {/* Selection Card */}
-                    <div className="relative rounded-2xl border border-[#3a3a5a] bg-gradient-to-b from-[#2a2a4a] to-[#1a1a3a] p-6 shadow-2xl">
+                    <div className="relative rounded-2xl border border-[#3a3a5a] bg-gradient-to-b from-[#2a2a4a] to-[#1a1a3a] p-4 shadow-2xl">
                         <div className="overflow-hidden rounded-xl bg-[#0f0f23] shadow-inner">
                             {/* URL Input Section */}
-                            <div className="border-[#2a2a4a] border-b bg-[#0a0a1a] p-6">
+                            <div className="border-[#2a2a4a] border-b bg-[#0a0a1a] p-4">
                                 <form onSubmit={handleUrlSubmit}>
                                     <label
                                         htmlFor="rom-url-input"
@@ -162,14 +162,14 @@ export default function Home() {
                             </div>
 
                             {/* Divider */}
-                            <div className="flex items-center gap-4 px-6 py-4">
+                            <div className="flex items-center gap-4 px-4 py-2">
                                 <div className="h-px flex-1 bg-[#2a2a4a]" />
                                 <span className="text-[#4a4a6a] text-sm">OR</span>
                                 <div className="h-px flex-1 bg-[#2a2a4a]" />
                             </div>
 
                             {/* GitHub Repository Browser */}
-                            <div className="border-[#2a2a4a] border-b bg-[#0a0a1a] p-6">
+                            <div className="border-[#2a2a4a] border-b bg-[#0a0a1a] p-4">
                                 <form
                                     onSubmit={(e) => {
                                         e.preventDefault();
@@ -211,7 +211,7 @@ export default function Home() {
                             </div>
 
                             {/* Divider */}
-                            <div className="flex items-center gap-4 px-6 py-4">
+                            <div className="flex items-center gap-4 px-4 py-2">
                                 <div className="h-px flex-1 bg-[#2a2a4a]" />
                                 <span className="text-[#4a4a6a] text-sm">OR</span>
                                 <div className="h-px flex-1 bg-[#2a2a4a]" />
@@ -223,7 +223,7 @@ export default function Home() {
                                 onDragOver={handleDragOver}
                                 onDragLeave={handleDragLeave}
                                 onDrop={handleDrop}
-                                className={`block cursor-pointer p-12 transition-all duration-300 ${
+                                className={`block cursor-pointer p-6 transition-all duration-300 ${
                                     isDragging
                                         ? 'border-2 border-yellow-400 border-dashed bg-yellow-500/10'
                                         : 'bg-[#0f0f23] hover:bg-[#151530]'
@@ -236,13 +236,13 @@ export default function Home() {
                                     onChange={handleFileSelect}
                                     className="hidden"
                                 />
-                                <div className="pointer-events-none flex flex-col items-center gap-4 text-center">
+                                <div className="pointer-events-none flex flex-col items-center gap-2 text-center">
                                     <div
-                                        className={`text-6xl transition-transform duration-300 ${isDragging ? 'scale-125' : ''}`}
+                                        className={`text-5xl transition-transform duration-300 ${isDragging ? 'scale-125' : ''}`}
                                     >
                                         {isDragging ? '📥' : '📂'}
                                     </div>
-                                    <h2 className="font-bold text-2xl text-[#cacafa]">
+                                    <h2 className="font-bold text-[#cacafa] text-xl">
                                         {isDragging ? 'Drop ROM here!' : 'Drag & Drop ROM File'}
                                     </h2>
                                     <p className="text-[#6a6a9a]">
@@ -261,9 +261,9 @@ export default function Home() {
                 </div>
 
                 {/* Info Section */}
-                <div className="mt-8 grid gap-4 md:grid-cols-2">
-                    <div className="rounded-xl border border-[#2a2a4a] bg-[#1a1a3a]/50 p-5">
-                        <h3 className="mb-3 flex items-center gap-2 font-bold text-yellow-400">
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <div className="rounded-xl border border-[#2a2a4a] bg-[#1a1a3a]/50 p-3">
+                        <h3 className="mb-2 flex items-center gap-2 font-bold text-yellow-400">
                             <span>⚡</span> Features
                         </h3>
                         <ul className="space-y-2 text-[#8a8aba] text-sm">
@@ -286,8 +286,8 @@ export default function Home() {
                         </ul>
                     </div>
 
-                    <div className="rounded-xl border border-[#2a2a4a] bg-[#1a1a3a]/50 p-5">
-                        <h3 className="mb-3 flex items-center gap-2 font-bold text-cyan-400">
+                    <div className="rounded-xl border border-[#2a2a4a] bg-[#1a1a3a]/50 p-3">
+                        <h3 className="mb-2 flex items-center gap-2 font-bold text-cyan-400">
                             <span>🔗</span> GitHub ROM URLs
                         </h3>
                         <p className="mb-2 text-[#8a8aba] text-sm">Use raw.githubusercontent.com URLs:</p>

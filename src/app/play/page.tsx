@@ -3,7 +3,9 @@
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { createPendingSettings } from '@/lib/emulator/channelState';
+import type { MusicDetectionResult } from '@/lib/emulator/types';
 import { getSavedChannelStates, saveChannelStates } from '@/lib/storage/channelStates';
 import { loadRomSource } from '@/lib/storage/roms';
 import type { CoreOption, GameEmulatorRef } from '../components/GameEmulator';
@@ -23,9 +25,13 @@ const GameEmulator = dynamic(() => import('../components/GameEmulator'), {
     ssr: false,
 });
 
+const MUSIC_SAMPLE_MS = 5000;
+const MUSIC_STATE_SETTLE_MS = 1000;
+
 function PlayContent() {
     const searchParams = useSearchParams();
     const emulatorRef = useRef<GameEmulatorRef>(null);
+    const detectingMusicRef = useRef(false);
 
     const [gameStarted, setGameStarted] = useState(false);
     const [coreOptions, setCoreOptions] = useState<CoreOption[]>([]);
@@ -88,7 +94,9 @@ function PlayContent() {
 
     const handleGameReady = (options: CoreOption[]) => {
         setGameStarted(true);
-        setCoreOptions(options);
+        if (!detectingMusicRef.current) {
+            setCoreOptions(options);
+        }
     };
 
     const handleSetVariable = (key: string, value: string): boolean => {
@@ -110,6 +118,50 @@ function PlayContent() {
             saveChannelStates(romSource, states);
         }
     };
+
+    const handleDetectMusic = useCallback(
+        async (
+            originalChannelStates: boolean[],
+            onProgress: (channel: number) => void,
+        ): Promise<MusicDetectionResult[]> => {
+            const emulator = emulatorRef.current;
+            const capturedState = emulator?.getState();
+            if (!emulator || !capturedState) {
+                throw new Error('Unable to capture the current game state');
+            }
+
+            const baselineState = new Uint8Array(capturedState);
+            const results: MusicDetectionResult[] = [];
+            detectingMusicRef.current = true;
+
+            try {
+                for (let index = 0; index < 8; index++) {
+                    onProgress(index + 1);
+                    const isolatedChannels = new Array(8).fill(false);
+                    isolatedChannels[index] = true;
+                    setGameStarted(false);
+                    await emulator.reloadEmulator(createPendingSettings(isolatedChannels), baselineState);
+                    await new Promise((resolve) => setTimeout(resolve, MUSIC_STATE_SETTLE_MS));
+                    results.push({ channel: index + 1, ...(await emulator.measureAudioActivity(MUSIC_SAMPLE_MS)) });
+                }
+
+                if (results.every((result) => result.maxRms === 0)) {
+                    throw new Error('No audio detected. Try again while music is playing and the emulator is unmuted.');
+                }
+
+                return results;
+            } finally {
+                try {
+                    setGameStarted(false);
+                    await emulator.reloadEmulator(createPendingSettings(originalChannelStates), baselineState);
+                    await new Promise((resolve) => setTimeout(resolve, MUSIC_STATE_SETTLE_MS));
+                } finally {
+                    detectingMusicRef.current = false;
+                }
+            }
+        },
+        [],
+    );
 
     // Prevent arrow keys from scrolling
     useEffect(() => {
@@ -203,13 +255,13 @@ function PlayContent() {
             </header>
 
             {/* Main Game Container */}
-            <main className="mx-auto max-w-6xl px-4 py-8">
+            <main className="mx-auto max-w-6xl px-4 py-4">
                 <div className="game-container relative">
                     {/* Glow effect */}
-                    <div className="absolute -inset-4 rounded-3xl bg-gradient-to-r from-red-500/20 via-yellow-500/20 to-green-500/20 blur-xl" />
+                    <div className="absolute -inset-2 rounded-3xl bg-gradient-to-r from-red-500/20 via-yellow-500/20 to-green-500/20 blur-xl" />
 
                     {/* Emulator frame */}
-                    <div className="relative rounded-2xl border border-[#3a3a5a] bg-gradient-to-b from-[#2a2a4a] to-[#1a1a3a] p-3 shadow-2xl">
+                    <div className="relative rounded-2xl border border-[#3a3a5a] bg-gradient-to-b from-[#2a2a4a] to-[#1a1a3a] p-2 shadow-2xl">
                         <div className="overflow-hidden rounded-xl bg-[#0f0f23] shadow-inner">
                             <div className="aspect-[4/3] w-full">
                                 <GameEmulator ref={emulatorRef} gameUrl={romUrl} onReady={handleGameReady} />
@@ -219,8 +271,10 @@ function PlayContent() {
                 </div>
 
                 {/* Controls info */}
-                <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
                     <SoundChannelMixer
+                        key={romSource}
+                        onDetectMusic={handleDetectMusic}
                         onSetVariable={handleSetVariable}
                         onReloadEmulator={handleReloadEmulator}
                         onSaveStates={handleSaveChannelStates}
@@ -230,12 +284,12 @@ function PlayContent() {
                         romName={romSource}
                     />
 
-                    <div className="rounded-xl border border-[#2a2a4a] bg-[#1a1a3a]/50 p-5">
-                        <h3 className="mb-3 flex items-center gap-2 font-bold text-sm text-yellow-400">
+                    <div className="rounded-xl border border-[#2a2a4a] bg-[#1a1a3a]/50 p-3">
+                        <h3 className="mb-2 flex items-center gap-2 font-bold text-sm text-yellow-400">
                             <span>⌨️</span> Keyboard Controls
                         </h3>
 
-                        <div className="space-y-3">
+                        <div className="space-y-2">
                             <div className="mb-1 text-[10px] text-cyan-400 uppercase tracking-wider">D-Pad</div>
                             <div className="grid grid-cols-2 gap-1 text-xs">
                                 <div className="flex justify-between text-[#8a8aba]">
@@ -244,7 +298,7 @@ function PlayContent() {
                                 </div>
                             </div>
 
-                            <div className="mt-3 mb-1 text-[10px] text-cyan-400 uppercase tracking-wider">
+                            <div className="mt-2 mb-1 text-[10px] text-cyan-400 uppercase tracking-wider">
                                 Face Buttons
                             </div>
                             <div className="grid grid-cols-2 gap-1 text-xs">
@@ -266,7 +320,7 @@ function PlayContent() {
                                 </div>
                             </div>
 
-                            <div className="mt-3 mb-1 text-[10px] text-cyan-400 uppercase tracking-wider">Shoulder</div>
+                            <div className="mt-2 mb-1 text-[10px] text-cyan-400 uppercase tracking-wider">Shoulder</div>
                             <div className="grid grid-cols-2 gap-1 text-xs">
                                 <div className="flex justify-between text-[#8a8aba]">
                                     <span>L</span>
@@ -278,7 +332,7 @@ function PlayContent() {
                                 </div>
                             </div>
 
-                            <div className="mt-3 mb-1 text-[10px] text-cyan-400 uppercase tracking-wider">Menu</div>
+                            <div className="mt-2 mb-1 text-[10px] text-cyan-400 uppercase tracking-wider">Menu</div>
                             <div className="grid grid-cols-2 gap-1 text-xs">
                                 <div className="flex justify-between text-[#8a8aba]">
                                     <span>Start</span>
@@ -290,7 +344,7 @@ function PlayContent() {
                                 </div>
                             </div>
 
-                            <div className="mt-3 mb-1 text-[10px] text-green-400 uppercase tracking-wider">
+                            <div className="mt-2 mb-1 text-[10px] text-green-400 uppercase tracking-wider">
                                 Emulator
                             </div>
                             <div className="grid grid-cols-2 gap-1 text-xs">
@@ -314,8 +368,8 @@ function PlayContent() {
                         </div>
                     </div>
 
-                    <div className="rounded-xl border border-[#2a2a4a] bg-[#1a1a3a]/50 p-5">
-                        <h3 className="mb-3 flex items-center gap-2 font-bold text-green-400 text-sm">
+                    <div className="rounded-xl border border-[#2a2a4a] bg-[#1a1a3a]/50 p-3">
+                        <h3 className="mb-2 flex items-center gap-2 font-bold text-green-400 text-sm">
                             <span>🎯</span> Tips
                         </h3>
                         <ul className="space-y-2 text-[#8a8aba] text-xs">
@@ -341,12 +395,12 @@ function PlayContent() {
                             </li>
                         </ul>
 
-                        <div className="mt-4 border-[#2a2a4a] border-t pt-3">
+                        <div className="mt-3 border-[#2a2a4a] border-t pt-2">
                             <h4 className="mb-2 font-bold text-purple-400 text-xs">🎵 Sound Channel Tips</h4>
                             <ul className="space-y-1 text-[#6a6a8a] text-[10px]">
-                                <li>• CH 1-4 typically carry melody/music</li>
-                                <li>• CH 5-8 often have drums/SFX</li>
-                                <li>• Mute CH 1-5 to hear just SFX</li>
+                                <li>• Music can span any combination of channels</li>
+                                <li>• Sustained voices are more likely to be music</li>
+                                <li>• Bursty voices are more likely to be sound effects</li>
                                 <li>• Your channel settings are saved per ROM</li>
                             </ul>
                         </div>

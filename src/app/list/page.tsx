@@ -21,7 +21,7 @@ interface GitHubTreeResponse {
     truncated?: boolean;
 }
 
-const ITEM_HEIGHT = 60; // Height of each ROM item in pixels
+const ITEM_HEIGHT = 52; // Height of each ROM item in pixels
 const VIEWPORT_BUFFER = 5; // Number of extra items to render above/below viewport
 
 // Parse GitHub URL to extract owner and repo
@@ -178,7 +178,7 @@ function RomListContent() {
 
             {/* Header */}
             <header className="sticky top-0 z-40 border-[#2a2a4a] border-b bg-gradient-to-b from-[#1a1a3a] to-[#0f0f23]">
-                <div className="mx-auto max-w-6xl px-6 py-6">
+                <div className="mx-auto max-w-6xl px-6 py-3">
                     <div className="flex items-center justify-between gap-4">
                         <button
                             type="button"
@@ -198,9 +198,9 @@ function RomListContent() {
             </header>
 
             {/* Main Content */}
-            <main className="mx-auto max-w-6xl px-4 py-6">
+            <main className="mx-auto max-w-6xl px-4 py-4">
                 {/* Search Bar */}
-                <div className="mb-6">
+                <div className="mb-3">
                     <form onSubmit={handleFilterSubmit}>
                         <div className="flex gap-3">
                             <input
@@ -208,11 +208,11 @@ function RomListContent() {
                                 type="text"
                                 placeholder="Search ROMs... (press Enter to search)"
                                 defaultValue={filterQuery}
-                                className="flex-1 rounded-lg border border-[#2a2a4a] bg-[#0f0f23] px-4 py-3 text-[#cacafa] placeholder-[#4a4a6a] focus:border-cyan-400/50 focus:outline-none"
+                                className="flex-1 rounded-lg border border-[#2a2a4a] bg-[#0f0f23] px-4 py-2 text-[#cacafa] placeholder-[#4a4a6a] focus:border-cyan-400/50 focus:outline-none"
                             />
                             <button
                                 type="submit"
-                                className="rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-8 py-3 font-bold text-white transition-all hover:from-purple-500 hover:to-blue-500"
+                                className="rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-2 font-bold text-white transition-all hover:from-purple-500 hover:to-blue-500"
                             >
                                 🔍 Search
                             </button>
@@ -247,7 +247,7 @@ function RomListContent() {
                         <div
                             ref={containerRef}
                             onScroll={handleScroll}
-                            className="relative h-[600px] overflow-y-auto rounded-xl border border-[#2a2a4a] bg-[#0f0f23]"
+                            className="relative h-[min(600px,calc(100svh-11rem))] min-h-[320px] overflow-y-auto rounded-xl border border-[#2a2a4a] bg-[#0f0f23]"
                             style={{ scrollBehavior: 'smooth' }}
                         >
                             <div style={{ height: totalHeight, position: 'relative' }}>
@@ -263,7 +263,7 @@ function RomListContent() {
                                                 type="button"
                                                 key={rom.sha}
                                                 onClick={() => handleRomSelect(rom)}
-                                                className="group w-full border-[#2a2a4a] border-b bg-[#0f0f23] px-6 py-4 text-left transition-all hover:border-cyan-400/50 hover:bg-[#1a1a3a]"
+                                                className="group w-full border-[#2a2a4a] border-b bg-[#0f0f23] px-4 py-2 text-left transition-all hover:border-cyan-400/50 hover:bg-[#1a1a3a]"
                                                 style={{ height: ITEM_HEIGHT }}
                                             >
                                                 <div className="flex items-center justify-between gap-4">

@@ -28,7 +28,7 @@ export default function ChannelButton({
                 type="button"
                 onClick={onToggle}
                 disabled={disabled}
-                className={`relative flex aspect-square w-full items-center justify-center rounded-lg transition-all ${
+                className={`relative flex aspect-square w-full items-center justify-center rounded-md transition-all ${
                     disabled
                         ? 'cursor-not-allowed bg-[#2a2a4a]'
                         : isUIEnabled
@@ -47,7 +47,7 @@ export default function ChannelButton({
             >
                 {/* LED indicator */}
                 <div
-                    className={`absolute top-1.5 right-1.5 h-2 w-2 rounded-full transition-all ${
+                    className={`absolute top-1 right-1 h-1.5 w-1.5 rounded-full transition-all ${
                         isEffectivelyPlaying && !disabled ? 'animate-pulse' : ''
                     }`}
                     style={{
@@ -74,7 +74,7 @@ export default function ChannelButton({
                 {/* Muted X indicator */}
                 {!isUIEnabled && !disabled && (
                     <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="font-bold text-2xl text-red-500/60">✕</span>
+                        <span className="font-bold text-red-500/60 text-xl">✕</span>
                     </div>
                 )}
 
@@ -82,9 +82,9 @@ export default function ChannelButton({
                 <div
                     className={`flex h-6 items-end gap-0.5 ${!isUIEnabled ? 'opacity-20' : needsReloadForThis ? 'opacity-50' : ''}`}
                 >
-                    {[0.4, 0.7, 1, 0.6, 0.8, 0.5, 0.9].map((height, barIndex) => (
+                    {[0.4, 0.7, 1, 0.6, 0.8, 0.5, 0.9].map((height) => (
                         <div
-                            key={`bar-${barIndex}-${height}`}
+                            key={height}
                             className="w-0.5 rounded-full transition-all"
                             style={{
                                 backgroundColor:
