@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/ragaeeb/hurmuzi/compare/v1.0.1...v1.1.0) (2026-08-30)
+
+
+### Features
+
+* **music:** Add local ROM caching, music-channel detection, UI refresh ([#6](https://github.com/ragaeeb/hurmuzi/issues/6)) ([85964ca](https://github.com/ragaeeb/hurmuzi/commit/85964ca42f3cb78af806f1634f850e50d3ece475))
+
 ## [1.0.1](https://github.com/ragaeeb/hurmuzi/compare/v1.0.0...v1.0.1) (2025-12-27)
 
 
