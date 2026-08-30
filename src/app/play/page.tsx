@@ -39,18 +39,17 @@ function PlayContent() {
     const [romError, setRomError] = useState<string | null>(null);
     const [romLoading, setRomLoading] = useState(true);
     const [romSource, setRomSource] = useState('');
-    const [romUrl, setRomUrl] = useState<string | null>(null);
+    const [romBlob, setRomBlob] = useState<Blob | null>(null);
     const [romName, setRomName] = useState<string>('Unknown Game');
     const source = searchParams.get('source');
 
     useEffect(() => {
         let cancelled = false;
-        let objectUrl: string | null = null;
         setGameStarted(false);
         setCoreOptions([]);
         setSavedChannelStates(null);
         setRomSource('');
-        setRomUrl(null);
+        setRomBlob(null);
         setRomError(null);
         setRomLoading(Boolean(source));
 
@@ -60,13 +59,11 @@ function PlayContent() {
 
         loadRomSource(source)
             .then((rom) => {
-                objectUrl = URL.createObjectURL(rom.blob);
                 if (cancelled) {
-                    URL.revokeObjectURL(objectUrl);
                     return;
                 }
 
-                setRomUrl(objectUrl);
+                setRomBlob(rom.blob);
                 setRomName(rom.name);
                 setRomSource(rom.source);
                 setSavedChannelStates(getSavedChannelStates(rom.source));
@@ -86,9 +83,6 @@ function PlayContent() {
 
         return () => {
             cancelled = true;
-            if (objectUrl) {
-                URL.revokeObjectURL(objectUrl);
-            }
         };
     }, [source]);
 
@@ -185,7 +179,7 @@ function PlayContent() {
         };
     }, []);
 
-    if (!romUrl) {
+    if (!romBlob) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-[#0a0a1a]">
                 <div className="text-center">
@@ -264,7 +258,12 @@ function PlayContent() {
                     <div className="relative rounded-2xl border border-[#3a3a5a] bg-gradient-to-b from-[#2a2a4a] to-[#1a1a3a] p-2 shadow-2xl">
                         <div className="overflow-hidden rounded-xl bg-[#0f0f23] shadow-inner">
                             <div className="aspect-[4/3] w-full">
-                                <GameEmulator ref={emulatorRef} gameUrl={romUrl} onReady={handleGameReady} />
+                                <GameEmulator
+                                    key={romSource}
+                                    ref={emulatorRef}
+                                    game={romBlob}
+                                    onReady={handleGameReady}
+                                />
                             </div>
                         </div>
                     </div>

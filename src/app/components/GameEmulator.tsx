@@ -9,7 +9,7 @@ const AUDIO_ACTIVE_RMS = 0.001;
 const AUDIO_SAMPLE_INTERVAL_MS = 50;
 
 interface GameEmulatorProps {
-    gameUrl: string;
+    game: Blob;
     core?: string;
     onReady?: (coreOptions: CoreOption[]) => void;
 }
@@ -27,7 +27,7 @@ export interface GameEmulatorRef {
 }
 
 const GameEmulator = forwardRef<GameEmulatorRef, GameEmulatorProps>(function GameEmulator(
-    { gameUrl, core = 'snes9x', onReady },
+    { game, core = 'snes9x', onReady },
     ref,
 ) {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -42,6 +42,8 @@ const GameEmulator = forwardRef<GameEmulatorRef, GameEmulatorProps>(function Gam
         timeout: ReturnType<typeof setTimeout>;
     } | null>(null);
     const [iframeKey, setIframeKey] = useState(0);
+    const [gameUrl, setGameUrl] = useState(() => URL.createObjectURL(game));
+    const gameUrlRef = useRef(gameUrl);
     const onReadyRef = useRef(onReady);
 
     useEffect(() => {
@@ -239,10 +241,14 @@ const GameEmulator = forwardRef<GameEmulatorRef, GameEmulatorProps>(function Gam
                 }, 30000);
 
                 pendingReloadRef.current = { reject, resolve, timeout };
+                URL.revokeObjectURL(gameUrlRef.current);
+                const nextGameUrl = URL.createObjectURL(game);
+                gameUrlRef.current = nextGameUrl;
+                setGameUrl(nextGameUrl);
                 setIframeKey((k) => k + 1);
             });
         },
-        [getEmulator],
+        [game, getEmulator],
     );
 
     useImperativeHandle(
@@ -278,6 +284,7 @@ const GameEmulator = forwardRef<GameEmulatorRef, GameEmulatorProps>(function Gam
                 clearTimeout(pendingReload.timeout);
                 pendingReload.reject(new Error('Emulator was removed during reload'));
             }
+            URL.revokeObjectURL(gameUrlRef.current);
         },
         [],
     );

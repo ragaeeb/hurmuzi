@@ -104,7 +104,11 @@ export default function SoundChannelMixer({
                 </button>
             </div>
 
-            {disabled && <p className="mb-2 text-[#6a6a8a] text-xs italic">Start the game to enable controls</p>}
+            {disabled && (
+                <p className="mb-2 text-[#6a6a8a] text-xs italic">
+                    {isDetectingMusic ? 'Music detection in progress…' : 'Start the game to enable controls'}
+                </p>
+            )}
 
             {!disabled && hasChannelSupport === false && (
                 <div className="mb-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2">
@@ -121,7 +125,7 @@ export default function SoundChannelMixer({
                 </div>
             )}
 
-            {!disabled && hasChannelSupport && (
+            {(!disabled || isDetectingMusic) && hasChannelSupport && (
                 <div className="mb-2">
                     <button
                         type="button"
