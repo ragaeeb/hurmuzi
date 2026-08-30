@@ -21,7 +21,7 @@ interface GitHubTreeResponse {
     truncated?: boolean;
 }
 
-const ITEM_HEIGHT = 52; // Height of each ROM item in pixels
+const ITEM_HEIGHT = 48; // Height of each ROM item in pixels
 const VIEWPORT_BUFFER = 5; // Number of extra items to render above/below viewport
 
 // Parse GitHub URL to extract owner and repo
@@ -76,7 +76,6 @@ function RomListContent() {
             const apiUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/master?recursive=1`;
 
             try {
-                console.log('Fetching from GitHub API:', apiUrl);
                 const response = await fetch(apiUrl);
 
                 if (!response.ok) {
@@ -87,8 +86,6 @@ function RomListContent() {
 
                 // Filter for compatible ROM files
                 const compatibleRoms = data.tree.filter((item) => item.type === 'blob' && isValidRomFile(item.path));
-
-                console.log(`Found ${compatibleRoms.length} compatible ROMs out of ${data.tree.length} items`);
                 setRoms(compatibleRoms);
                 setFilteredRoms(compatibleRoms);
             } catch (err) {
@@ -164,140 +161,149 @@ function RomListContent() {
     };
 
     return (
-        <div className="min-h-screen bg-[#0a0a1a] font-mono">
+        <div className="flex min-h-screen flex-col bg-[#070712]">
             {/* Scanline overlay */}
-            <div className="pointer-events-none fixed inset-0 z-50 opacity-[0.03]">
+            <div className="pointer-events-none fixed inset-0 z-50 opacity-[0.02]">
                 <div
                     className="h-full w-full"
                     style={{
                         backgroundImage:
-                            'repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(0,0,0,0.3) 1px, rgba(0,0,0,0.3) 2px)',
+                            'repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(0,0,0,0.4) 1px, rgba(0,0,0,0.4) 2px)',
                     }}
                 />
             </div>
 
             {/* Header */}
-            <header className="sticky top-0 z-40 border-[#2a2a4a] border-b bg-gradient-to-b from-[#1a1a3a] to-[#0f0f23]">
-                <div className="mx-auto max-w-6xl px-6 py-3">
-                    <div className="flex items-center justify-between gap-4">
+            <header className="sticky top-0 z-40 w-full border-white/10 border-b bg-[#090918]/80 backdrop-blur-md">
+                <div className="flex w-full items-center justify-between px-4 py-3 md:px-8">
+                    <div className="flex items-center gap-3">
                         <button
                             type="button"
                             onClick={() => router.push('/')}
-                            className="text-[#6a6a9a] transition-colors hover:text-cyan-400"
+                            className="group flex items-center gap-1.5 rounded-lg border border-white/10 bg-[#121226] px-3 py-1.5 font-medium text-xs text-zinc-300 transition-all duration-150 hover:border-white/20 hover:bg-[#181832] hover:text-white active:scale-95"
                         >
-                            ← Back
+                            <span>←</span>
+                            <span>Back</span>
                         </button>
-                        <h1 className="font-bold text-xl tracking-tight md:text-2xl">
-                            <span className="bg-gradient-to-r from-red-500 via-yellow-400 to-green-400 bg-clip-text text-transparent">
-                                ROM Library
-                            </span>
-                        </h1>
-                        <div className="w-16" /> {/* Spacer for centering */}
+                        <h1 className="font-semibold text-base text-zinc-100 md:text-lg">ROM Library Browser</h1>
                     </div>
+
+                    {!loading && !error && (
+                        <div className="font-mono text-xs text-zinc-400">
+                            <span className="font-semibold text-cyan-400">{filteredRoms.length}</span> ROMs
+                        </div>
+                    )}
                 </div>
             </header>
 
-            {/* Main Content */}
-            <main className="mx-auto max-w-6xl px-4 py-4">
-                {/* Search Bar */}
-                <div className="mb-3">
-                    <form onSubmit={handleFilterSubmit}>
-                        <div className="flex gap-3">
-                            <input
-                                name="filter"
-                                type="text"
-                                placeholder="Search ROMs... (press Enter to search)"
-                                defaultValue={filterQuery}
-                                className="flex-1 rounded-lg border border-[#2a2a4a] bg-[#0f0f23] px-4 py-2 text-[#cacafa] placeholder-[#4a4a6a] focus:border-cyan-400/50 focus:outline-none"
-                            />
-                            <button
-                                type="submit"
-                                className="rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-2 font-bold text-white transition-all hover:from-purple-500 hover:to-blue-500"
+            {/* Main Content Area (Full-Width) */}
+            <main className="w-full flex-1 px-4 py-4 md:px-8">
+                <div className="mx-auto w-full max-w-7xl">
+                    {/* Search Bar */}
+                    <div className="mb-3">
+                        <form onSubmit={handleFilterSubmit}>
+                            <div className="flex gap-2">
+                                <input
+                                    name="filter"
+                                    type="text"
+                                    placeholder="Search ROM name or path... (Press Enter)"
+                                    defaultValue={filterQuery}
+                                    className="flex-1 rounded-xl border border-white/10 bg-[#0f0f22] px-4 py-2.5 text-xs text-zinc-200 placeholder-zinc-600 transition-colors focus:border-cyan-400/50 focus:bg-[#13132c] focus:outline-none"
+                                />
+                                <button
+                                    type="submit"
+                                    className="group relative overflow-hidden rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 px-5 py-2.5 font-semibold text-white text-xs shadow-[0_0_15px_rgba(99,102,241,0.3)] transition-all duration-200 hover:shadow-[0_0_25px_rgba(99,102,241,0.5)] active:scale-95"
+                                >
+                                    <div className="pointer-events-none absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+                                    <span className="relative flex items-center gap-1.5">
+                                        <span>🔍</span>
+                                        <span>Filter</span>
+                                    </span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    {/* Status Display */}
+                    {loading && (
+                        <div className="flex flex-col items-center justify-center py-24">
+                            <div className="mb-3 h-10 w-10 animate-spin rounded-full border-3 border-cyan-400 border-t-transparent" />
+                            <p className="font-mono text-xs text-zinc-400">Loading ROM collection from GitHub...</p>
+                        </div>
+                    )}
+
+                    {error && (
+                        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-6 text-center">
+                            <p className="font-medium text-red-300 text-sm">❌ {error}</p>
+                        </div>
+                    )}
+
+                    {!loading && !error && (
+                        <>
+                            {/* ROM List with Virtual Scrolling */}
+                            <div
+                                ref={containerRef}
+                                onScroll={handleScroll}
+                                className="relative h-[calc(100vh-12rem)] min-h-[380px] overflow-y-auto rounded-2xl border border-white/10 bg-[#0c0c1e] shadow-inner"
                             >
-                                🔍 Search
-                            </button>
-                        </div>
-                    </form>
-                </div>
+                                <div style={{ height: totalHeight, position: 'relative' }}>
+                                    <div style={{ transform: `translateY(${offsetY}px)` }}>
+                                        {visibleRoms.map((rom) => {
+                                            const fileName = rom.path.split('/').pop() || rom.path;
+                                            const directory = rom.path.includes('/')
+                                                ? rom.path.substring(0, rom.path.lastIndexOf('/'))
+                                                : '';
+                                            const extension = fileName.split('.').pop() || '';
 
-                {/* Status Display */}
-                {loading && (
-                    <div className="py-12 text-center">
-                        <div className="mb-4 inline-block animate-spin text-4xl">⏳</div>
-                        <p className="text-[#6a6a9a]">Loading ROMs from GitHub...</p>
-                    </div>
-                )}
-
-                {error && (
-                    <div className="rounded-xl border border-red-500/50 bg-red-500/10 p-6 text-center">
-                        <p className="text-red-400">❌ {error}</p>
-                    </div>
-                )}
-
-                {!loading && !error && (
-                    <>
-                        {/* Results Count */}
-                        <div className="mb-4 text-[#6a6a9a] text-sm">
-                            Found <span className="font-bold text-cyan-400">{filteredRoms.length}</span> compatible ROM
-                            {filteredRoms.length !== 1 ? 's' : ''}
-                            {filterQuery && ` matching "${filterQuery}"`}
-                        </div>
-
-                        {/* ROM List with Virtual Scrolling */}
-                        <div
-                            ref={containerRef}
-                            onScroll={handleScroll}
-                            className="relative h-[min(600px,calc(100svh-11rem))] min-h-[320px] overflow-y-auto rounded-xl border border-[#2a2a4a] bg-[#0f0f23]"
-                            style={{ scrollBehavior: 'smooth' }}
-                        >
-                            <div style={{ height: totalHeight, position: 'relative' }}>
-                                <div style={{ transform: `translateY(${offsetY}px)` }}>
-                                    {visibleRoms.map((rom) => {
-                                        const fileName = rom.path.split('/').pop() || rom.path;
-                                        const directory = rom.path.includes('/')
-                                            ? rom.path.substring(0, rom.path.lastIndexOf('/'))
-                                            : '';
-
-                                        return (
-                                            <button
-                                                type="button"
-                                                key={rom.sha}
-                                                onClick={() => handleRomSelect(rom)}
-                                                className="group w-full border-[#2a2a4a] border-b bg-[#0f0f23] px-4 py-2 text-left transition-all hover:border-cyan-400/50 hover:bg-[#1a1a3a]"
-                                                style={{ height: ITEM_HEIGHT }}
-                                            >
-                                                <div className="flex items-center justify-between gap-4">
-                                                    <div className="min-w-0 flex-1">
-                                                        <div className="truncate font-medium text-[#cacafa] transition-colors group-hover:text-cyan-400">
-                                                            🎮 {fileName}
-                                                        </div>
-                                                        {directory && (
-                                                            <div className="mt-1 truncate text-[#6a6a9a] text-xs">
-                                                                📁 {directory}
+                                            return (
+                                                <button
+                                                    type="button"
+                                                    key={rom.sha}
+                                                    onClick={() => handleRomSelect(rom)}
+                                                    className="group flex w-full items-center justify-between border-white/5 border-b bg-[#0c0c1e] px-4 text-left transition-all duration-150 hover:border-cyan-500/20 hover:bg-[#151532] active:scale-[0.99]"
+                                                    style={{ height: ITEM_HEIGHT }}
+                                                >
+                                                    <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                                                        <span className="text-zinc-500 transition-colors group-hover:text-cyan-400">
+                                                            🎮
+                                                        </span>
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="truncate font-medium text-xs text-zinc-200 transition-colors group-hover:text-cyan-300">
+                                                                {fileName}
                                                             </div>
+                                                            {directory && (
+                                                                <div className="truncate font-mono text-[10px] text-zinc-500">
+                                                                    📁 {directory}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="rounded border border-white/5 bg-[#121226] px-1.5 py-0.5 font-mono text-[10px] text-zinc-400 uppercase">
+                                                            {extension}
+                                                        </span>
+                                                        {rom.size && (
+                                                            <span className="whitespace-nowrap font-mono text-[10px] text-zinc-500">
+                                                                {(rom.size / 1024).toFixed(0)} KB
+                                                            </span>
                                                         )}
                                                     </div>
-                                                    {rom.size && (
-                                                        <div className="whitespace-nowrap text-[#6a6a9a] text-xs">
-                                                            {(rom.size / 1024).toFixed(1)} KB
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </button>
-                                        );
-                                    })}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        {filteredRoms.length === 0 && !loading && (
-                            <div className="py-12 text-center text-[#6a6a9a]">
-                                No compatible ROMs found
-                                {filterQuery && ' matching your search'}
-                            </div>
-                        )}
-                    </>
-                )}
+                            {filteredRoms.length === 0 && (
+                                <div className="py-16 text-center text-xs text-zinc-500">
+                                    No compatible ROMs found{filterQuery && ` matching "${filterQuery}"`}
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
             </main>
         </div>
     );
@@ -307,10 +313,10 @@ export default function ListPage() {
     return (
         <Suspense
             fallback={
-                <div className="flex min-h-screen items-center justify-center bg-[#0a0a1a] font-mono">
-                    <div className="text-center">
-                        <div className="mb-4 inline-block animate-spin text-4xl">⏳</div>
-                        <p className="text-[#6a6a9a]">Loading...</p>
+                <div className="flex min-h-screen items-center justify-center bg-[#070712]">
+                    <div className="flex flex-col items-center gap-3">
+                        <div className="h-10 w-10 animate-spin rounded-full border-3 border-cyan-400 border-t-transparent" />
+                        <p className="font-mono text-xs text-zinc-400">Loading ROM Library...</p>
                     </div>
                 </div>
             }

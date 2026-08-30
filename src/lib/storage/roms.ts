@@ -15,6 +15,12 @@ export interface LoadedRom {
     source: string;
 }
 
+export interface StoredRom {
+    lastModified: number;
+    name: string;
+    source: string;
+}
+
 function getStorageManager(): OpfsStorageManager {
     const storage = navigator.storage as OpfsStorageManager | undefined;
     if (!storage?.getDirectory) {
@@ -92,10 +98,14 @@ export async function saveLocalRom(file: File): Promise<string> {
     return `opfs:/${ROMS_DIRECTORY}/${LOCAL_DIRECTORY}/${id}/${encodeURIComponent(name)}`;
 }
 
-async function loadLocalRom(source: string): Promise<LoadedRom> {
+async function loadStoredRom(source: string): Promise<LoadedRom> {
     const url = new URL(source);
     const parts = url.pathname.split('/').filter(Boolean).map(decodeURIComponent);
-    if (parts.length !== 4 || parts[0] !== ROMS_DIRECTORY || parts[1] !== LOCAL_DIRECTORY) {
+    if (
+        parts.length !== 4 ||
+        parts[0] !== ROMS_DIRECTORY ||
+        (parts[1] !== LOCAL_DIRECTORY && parts[1] !== REMOTE_DIRECTORY)
+    ) {
         throw new Error('Invalid OPFS ROM source');
     }
 
@@ -103,6 +113,45 @@ async function loadLocalRom(source: string): Promise<LoadedRom> {
     const directory = await getDirectory(parts.slice(0, -1), false);
     const file = await (await directory.getFileHandle(name)).getFile();
     return { blob: file, cacheHit: true, name, source };
+}
+
+export async function listStoredRoms(limit = 8): Promise<StoredRom[]> {
+    const roms: StoredRom[] = [];
+
+    for (const category of [LOCAL_DIRECTORY, REMOTE_DIRECTORY]) {
+        try {
+            const directory = await getDirectory([ROMS_DIRECTORY, category], false);
+            for await (const entry of directory.values()) {
+                if (entry.kind !== 'directory') {
+                    continue;
+                }
+                for await (const handle of (entry as FileSystemDirectoryHandle).values()) {
+                    if (handle.kind !== 'file' || !isValidRomFile(handle.name)) {
+                        continue;
+                    }
+                    const file = await (handle as FileSystemFileHandle).getFile();
+                    roms.push({
+                        lastModified: file.lastModified,
+                        name: file.name,
+                        source: `opfs:/${ROMS_DIRECTORY}/${category}/${entry.name}/${encodeURIComponent(file.name)}`,
+                    });
+                }
+            }
+        } catch (error) {
+            if (!(error instanceof DOMException) || error.name !== 'NotFoundError') {
+                throw error;
+            }
+        }
+    }
+
+    // ponytail: Filename is the recent-list identity; use content hashes if same-name variants must coexist.
+    const unique = new Map<string, StoredRom>();
+    for (const rom of roms.sort((a, b) => b.lastModified - a.lastModified)) {
+        if (!unique.has(rom.name.toLowerCase())) {
+            unique.set(rom.name.toLowerCase(), rom);
+        }
+    }
+    return Array.from(unique.values()).slice(0, limit);
 }
 
 async function loadRemoteCache(source: string): Promise<File | null> {
@@ -148,7 +197,7 @@ async function downloadRemoteRom(source: string): Promise<{ blob: Blob; name: st
 
 export async function loadRomSource(value: string): Promise<LoadedRom> {
     if (value.startsWith('opfs:')) {
-        return loadLocalRom(value);
+        return loadStoredRom(value);
     }
 
     const source = normalizeRemoteRomSource(value);
