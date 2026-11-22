@@ -27,8 +27,8 @@
         "typescript": "^7.0.2"
     },
     "engines": {
-        "bun": ">=1.4.0",
-        "node": ">=24.0.0"
+        "bun": ">=1.4.5",
+        "node": ">=26.0.0"
     },
     "homepage": "https://github.com/ragaeeb/hurmuzi",
     "keywords": [
@@ -40,7 +40,7 @@
     ],
     "license": "MIT",
     "name": "hurmuzi",
-    "packageManager": "bun@1.4.0",
+    "packageManager": "bun@1.4.5",
     "private": true,
     "repository": {
         "type": "git",
@@ -53,5 +53,5 @@
         "lint": "biome check",
         "start": "next start"
     },
-    "version": "1.1.0"
+    "version": "1.2.0"
 }
