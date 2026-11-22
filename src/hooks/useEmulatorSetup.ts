@@ -78,7 +78,10 @@ export function useEmulatorSetup({
             iframeWin.EJS_gameUrl = gameUrl;
             iframeWin.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
             iframeWin.EJS_color = '#1a1a2e';
-            iframeWin.EJS_startOnLoaded = true;
+            // Safari rejects audio started without a same-page user gesture (NotAllowedError → black screen),
+            // so let EmulatorJS show its Start button there.
+            const isSafari = /^((?!chrome|chromium|crios|fxios|edg|android).)*safari/i.test(navigator.userAgent);
+            iframeWin.EJS_startOnLoaded = !isSafari;
 
             // Store current values in closure
             const currentPendingSettings = pendingSettings;
