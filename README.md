@@ -48,14 +48,26 @@ bun dev
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ### Building for Production
 
 ```bash
-bun run build
-bun start
+bun run build     # Outputs the static app (and Cloudflare bundle) to .cloudflare/
+bun run preview   # Serves the production build locally
 ```
+
+### Deployment
+
+Hurmuzi is a static single-page app served from Cloudflare Workers static assets at
+[snes.al-iyaal.club](https://snes.al-iyaal.club). Configuration lives in `cloudflare.config.ts`
+(custom domain, SPA fallback so `/play` and `/list` resolve to the app).
+
+- **Automatic:** Workers Builds is connected to this GitHub repository. Every push or merge to `main` runs
+  `bun test` and then `bun run deploy`.
+- **Manual:** with the [`cf` CLI](https://developers.cloudflare.com/) authenticated, run `bun run deploy`.
+
+Optional build-time defaults for the home page inputs: `VITE_DEFAULT_ROM_URL` and `VITE_DEFAULT_REPO_URL`.
 
 ## Usage
 
@@ -127,6 +139,9 @@ hurmuzi/
 │       ├── useChannelMixer.ts        # Channel toggle & effective state hook
 │       ├── useMusicScan.ts           # Runs or recalls the music scan for a ROM
 │       └── useEmulatorSetup.ts       # Emulator iframe lifecycle hook
+├── index.html                        # Vite entry
+├── vite.config.ts                    # Vite, React Compiler & Tailwind
+├── cloudflare.config.ts              # Cloudflare Worker (assets, domain)
 ├── core/snes9x-probe/                # Source & build script of the headless voice probe
 ├── scripts/scan-rom.ts               # Command-line harness for the music scan
 ├── public/                           # Static assets (incl. the prebuilt voice probe)

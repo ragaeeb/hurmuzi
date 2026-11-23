@@ -225,6 +225,15 @@ bun run build    # Production build
 bun run deploy   # Build and deploy to Cloudflare
 ```
 
+## Deployment
+
+- Hosted on Cloudflare Workers static assets at `snes.al-iyaal.club`; config in `cloudflare.config.ts`
+  (domain, SPA fallback, observability). `vite.config.ts` includes `@cloudflare/vite-plugin`.
+- Workers Builds (managed with `cf builds ...`) watches `main`: build command `bun test`, deploy command
+  `bun run deploy` (`cf deploy`). Work happens on `next`; merging to `main` ships to production.
+- Manual deploy: `bun run deploy` (needs an authenticated `cf` CLI).
+- Optional build-time env: `VITE_DEFAULT_ROM_URL`, `VITE_DEFAULT_REPO_URL` (read via `import.meta.env`).
+
 ## Troubleshooting
 
 ### Emulator Not Loading
