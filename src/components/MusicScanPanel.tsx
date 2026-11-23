@@ -1,5 +1,3 @@
-'use client';
-
 import type { MusicScanState } from '@/hooks/useMusicScan';
 import type { ChannelRole } from '@/lib/emulator/musicScan';
 

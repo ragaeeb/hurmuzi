@@ -13,12 +13,9 @@
 # testing
 /coverage
 
-# next.js
-/.next/
-/out/
-
 # production
 /build
+/dist
 
 # misc
 .DS_Store
@@ -33,12 +30,16 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
-# vercel
-.vercel
+# cloudflare
+.wrangler
 
 # typescript
 *.tsbuildinfo
-next-env.d.ts
 
 # snes9x probe build checkout
 /core/snes9x-probe/vendor
+
+.dev.vars*
+!.dev.vars.example
+!.env.example
+/.cloudflare

@@ -1,5 +1,3 @@
-'use client';
-
 import type { ChannelRole } from '@/lib/emulator/musicScan';
 import type { SnesChannel } from '@/lib/emulator/types';
 

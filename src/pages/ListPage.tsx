@@ -1,7 +1,5 @@
-'use client';
-
-import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router';
 import { isValidRomFile } from '@/lib/emulator/utils';
 import { normalizeRemoteRomSource } from '@/lib/storage/roms';
 
@@ -38,9 +36,9 @@ const parseGitHubUrl = (githubUrl: string): { owner: string; repo: string } | nu
     return null;
 };
 
-function RomListContent() {
-    const router = useRouter();
-    const searchParams = useSearchParams();
+export default function ListPage() {
+    const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const url = searchParams.get('url');
 
     const [roms, setRoms] = useState<GitHubTreeItem[]>([]);
@@ -142,7 +140,7 @@ function RomListContent() {
             const source = normalizeRemoteRomSource(
                 `https://raw.githubusercontent.com/${repository.owner}/${repository.repo}/master/${path}`,
             );
-            router.push(`/play?source=${encodeURIComponent(source)}`);
+            navigate(`/play?source=${encodeURIComponent(source)}`);
         } catch (err) {
             console.error('Failed to open ROM:', err);
             alert(err instanceof Error ? err.message : 'Failed to open ROM');
@@ -190,7 +188,7 @@ function RomListContent() {
                     <div className="flex items-center gap-3">
                         <button
                             type="button"
-                            onClick={() => router.push('/')}
+                            onClick={() => navigate('/')}
                             className="group flex items-center gap-1.5 rounded-lg border border-white/10 bg-[#121226] px-3 py-1.5 font-medium text-xs text-zinc-300 transition-all duration-150 hover:border-white/20 hover:bg-[#181832] hover:text-white active:scale-95"
                         >
                             <span>←</span>
@@ -317,22 +315,5 @@ function RomListContent() {
                 </div>
             </main>
         </div>
-    );
-}
-
-export default function ListPage() {
-    return (
-        <Suspense
-            fallback={
-                <div className="flex min-h-screen items-center justify-center bg-[#070712]">
-                    <div className="flex flex-col items-center gap-3">
-                        <div className="h-10 w-10 animate-spin rounded-full border-3 border-cyan-400 border-t-transparent" />
-                        <p className="font-mono text-xs text-zinc-400">Loading ROM Library...</p>
-                    </div>
-                </div>
-            }
-        >
-            <RomListContent />
-        </Suspense>
     );
 }

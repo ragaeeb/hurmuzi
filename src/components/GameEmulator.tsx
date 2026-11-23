@@ -1,5 +1,3 @@
-'use client';
-
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { useEmulatorSetup } from '@/hooks/useEmulatorSetup';
 import type { CoreOption, EmulatorInstance } from '@/lib/emulator/types';

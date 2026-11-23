@@ -1,29 +1,24 @@
-'use client';
-
-import dynamic from 'next/dynamic';
-import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router';
 import { useMusicScan } from '@/hooks/useMusicScan';
 import { getSavedChannelStates, saveChannelStates } from '@/lib/storage/channelStates';
 import { loadRomSource } from '@/lib/storage/roms';
-import type { CoreOption, GameEmulatorRef } from '../components/GameEmulator';
-import SoundChannelMixer from '../components/SoundChannelMixer';
+import type { CoreOption, GameEmulatorRef } from '@/components/GameEmulator';
+import SoundChannelMixer from '@/components/SoundChannelMixer';
 
-const GameEmulator = dynamic(() => import('../components/GameEmulator'), {
-    loading: () => (
-        <div className="flex h-full min-h-[480px] w-full items-center justify-center bg-[#0c0c1e]">
-            <div className="flex flex-col items-center gap-3">
-                <div className="h-10 w-10 animate-spin rounded-full border-3 border-cyan-400 border-t-transparent" />
-                <span className="font-mono text-cyan-400 text-xs tracking-wider">Initializing Core...</span>
-            </div>
+const GameEmulator = lazy(() => import('@/components/GameEmulator'));
+
+const EmulatorLoading = () => (
+    <div className="flex h-full min-h-[480px] w-full items-center justify-center bg-[#0c0c1e]">
+        <div className="flex flex-col items-center gap-3">
+            <div className="h-10 w-10 animate-spin rounded-full border-3 border-cyan-400 border-t-transparent" />
+            <span className="font-mono text-cyan-400 text-xs tracking-wider">Initializing Core...</span>
         </div>
-    ),
-    ssr: false,
-});
+    </div>
+);
 
-function PlayContent() {
-    const searchParams = useSearchParams();
+export default function PlayPage() {
+    const [searchParams] = useSearchParams();
     const emulatorRef = useRef<GameEmulatorRef>(null);
 
     const [gameStarted, setGameStarted] = useState(false);
@@ -138,7 +133,7 @@ function PlayContent() {
                         {romLoading ? 'Retrieving and verifying game data...' : 'Could not launch the requested game.'}
                     </p>
                     <Link
-                        href="/"
+                        to="/"
                         className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-2.5 font-semibold text-white text-xs shadow-[0_0_15px_rgba(99,102,241,0.3)] transition-all duration-200 hover:shadow-[0_0_25px_rgba(99,102,241,0.5)] active:scale-95"
                     >
                         <span>← Back to Home</span>
@@ -166,7 +161,7 @@ function PlayContent() {
                 <div className="flex w-full items-center justify-between px-4 py-2.5 md:px-8">
                     <div className="flex min-w-0 items-center gap-3">
                         <Link
-                            href="/"
+                            to="/"
                             className="group flex items-center gap-1.5 rounded-lg border border-white/10 bg-[#121226] px-3 py-1.5 font-medium text-xs text-zinc-300 transition-all duration-150 hover:border-white/20 hover:bg-[#181832] hover:text-white active:scale-95"
                         >
                             <span>←</span>
@@ -210,12 +205,14 @@ function PlayContent() {
                         <div className="game-container relative w-full overflow-hidden rounded-2xl border border-white/10 bg-[#0a0a1a] shadow-2xl">
                             {/* Emulator Container */}
                             <div className="relative aspect-[4/3] w-full bg-[#05050d]">
-                                <GameEmulator
-                                    key={romSource}
-                                    ref={emulatorRef}
-                                    game={romBlob}
-                                    onReady={handleGameReady}
-                                />
+                                <Suspense fallback={<EmulatorLoading />}>
+                                    <GameEmulator
+                                        key={romSource}
+                                        ref={emulatorRef}
+                                        game={romBlob}
+                                        onReady={handleGameReady}
+                                    />
+                                </Suspense>
                             </div>
                         </div>
                     </div>
@@ -337,22 +334,5 @@ function PlayContent() {
                 </div>
             </main>
         </div>
-    );
-}
-
-export default function Play() {
-    return (
-        <Suspense
-            fallback={
-                <div className="flex min-h-screen items-center justify-center bg-[#070712]">
-                    <div className="flex flex-col items-center gap-3">
-                        <div className="h-10 w-10 animate-spin rounded-full border-3 border-cyan-400 border-t-transparent" />
-                        <span className="font-mono text-cyan-400 text-xs tracking-wider">Loading Game...</span>
-                    </div>
-                </div>
-            }
-        >
-            <PlayContent />
-        </Suspense>
     );
 }

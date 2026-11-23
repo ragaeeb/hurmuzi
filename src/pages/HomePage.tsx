@@ -1,7 +1,5 @@
-'use client';
-
-import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { getValidRomExtensions, isValidRomFile } from '@/lib/emulator/utils';
 import {
     getRomNameFromSource,
@@ -13,8 +11,8 @@ import {
 
 type TabType = 'upload' | 'url' | 'repo';
 
-export default function Home() {
-    const router = useRouter();
+export default function HomePage() {
+    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<TabType>('upload');
     const [isDragging, setIsDragging] = useState(false);
     const [recentRoms, setRecentRoms] = useState<StoredRom[]>([]);
@@ -41,7 +39,7 @@ export default function Home() {
 
         try {
             const source = await saveLocalRom(file);
-            router.push(`/play?source=${encodeURIComponent(source)}`);
+            navigate(`/play?source=${encodeURIComponent(source)}`);
         } catch (error) {
             console.error('Failed to cache local ROM:', error);
             alert(error instanceof Error ? error.message : 'Failed to cache local ROM');
@@ -63,7 +61,7 @@ export default function Home() {
             const source = normalizeRemoteRomSource(url);
             getRomNameFromSource(source);
             form.reset();
-            router.push(`/play?source=${encodeURIComponent(source)}`);
+            navigate(`/play?source=${encodeURIComponent(source)}`);
         } catch (error) {
             console.error('Failed to load ROM from URL:', error);
             alert(error instanceof Error ? error.message : 'Failed to download ROM');
@@ -75,7 +73,7 @@ export default function Home() {
         const formData = new FormData(e.currentTarget);
         const repoUrl = formData.get('repo-url') as string;
         if (repoUrl?.trim()) {
-            router.push(`/list?url=${encodeURIComponent(repoUrl)}`);
+            navigate(`/list?url=${encodeURIComponent(repoUrl)}`);
         } else {
             alert('Please enter a GitHub repository URL');
         }
@@ -150,7 +148,7 @@ export default function Home() {
                                 defaultValue=""
                                 onChange={(e) => {
                                     if (e.target.value) {
-                                        router.push(`/play?source=${encodeURIComponent(e.target.value)}`);
+                                        navigate(`/play?source=${encodeURIComponent(e.target.value)}`);
                                     }
                                 }}
                                 className="max-w-[200px] truncate rounded-lg border border-white/10 bg-[#121226] px-2.5 py-1 text-xs text-zinc-200 transition-colors focus:border-cyan-400/50 focus:outline-none"
@@ -291,7 +289,7 @@ export default function Home() {
                                                 id="rom-url-input"
                                                 name="rom-url"
                                                 type="url"
-                                                defaultValue={process.env.NEXT_PUBLIC_DEFAULT_ROM_URL}
+                                                defaultValue={import.meta.env.VITE_DEFAULT_ROM_URL}
                                                 placeholder="https://raw.githubusercontent.com/.../game.sfc"
                                                 className="flex-1 rounded-xl border border-white/10 bg-[#121228] px-4 py-2.5 font-mono text-xs text-zinc-200 placeholder-zinc-600 transition-colors focus:border-cyan-400/60 focus:bg-[#161632] focus:outline-none"
                                             />
@@ -328,7 +326,7 @@ export default function Home() {
                                                 id="repo-url-input"
                                                 name="repo-url"
                                                 type="url"
-                                                defaultValue={process.env.NEXT_PUBLIC_DEFAULT_REPO_URL}
+                                                defaultValue={import.meta.env.VITE_DEFAULT_REPO_URL}
                                                 placeholder="https://github.com/user/snes-roms"
                                                 className="flex-1 rounded-xl border border-white/10 bg-[#121228] px-4 py-2.5 font-mono text-xs text-zinc-200 placeholder-zinc-600 transition-colors focus:border-emerald-400/60 focus:bg-[#161632] focus:outline-none"
                                             />

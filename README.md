@@ -4,7 +4,7 @@ A web-based SNES emulator with advanced sound channel mixing capabilities and in
 
 [![wakatime](https://wakatime.com/badge/user/a0b906ce-b8e7-4463-8bce-383238df6d4b/project/3bf575f0-9916-409b-8189-e01c57c9aac0.svg)](https://wakatime.com/badge/user/a0b906ce-b8e7-4463-8bce-383238df6d4b/project/3bf575f0-9916-409b-8189-e01c57c9aac0)
 [![codecov](https://codecov.io/gh/ragaeeb/hurmuzi/graph/badge.svg?token=VQ1PMX2XAH)](https://codecov.io/gh/ragaeeb/hurmuzi)
-[![Vercel Deploy](https://deploy-badge.vercel.app/vercel/hurmuzi)](https://hurmuzi.vercel.app)
+[![Live](https://img.shields.io/badge/live-snes.al--iyaal.club-blue)](https://snes.al-iyaal.club)
 [![typescript](https://badgen.net/badge/icon/typescript?icon=typescript&label&color=blue)](https://www.typescriptlang.org)
 [![Node.js CI](https://github.com/ragaeeb/hurmuzi/actions/workflows/build.yml/badge.svg)](https://github.com/ragaeeb/hurmuzi/actions/workflows/build.yml)
 ![Bun](https://img.shields.io/badge/Bun-%23000000.svg?style=for-the-badge&logo=bun&logoColor=white)
@@ -99,20 +99,18 @@ Paste a direct download link or GitHub raw URL (e.g. `https://raw.githubusercont
 ```
 hurmuzi/
 ├── src/
-│   ├── app/
-│   │   ├── components/
-│   │   │   ├── ChannelButton.tsx     # Animated tactile channel button & equalizer
-│   │   │   ├── GameEmulator.tsx      # Isolated iframe emulator bridge
-│   │   │   ├── MusicScanPanel.tsx    # Music scan progress, verdicts & mute button
-│   │   │   ├── SoundChannelMixer.tsx # 8-channel mixer
-│   │   │   └── footer.tsx            # Full-width footer component
-│   │   ├── list/
-│   │   │   └── page.tsx              # GitHub ROM browser with virtual scrolling
-│   │   ├── play/
-│   │   │   └── page.tsx              # Game player dashboard & controls
-│   │   ├── page.tsx                  # Segmented compact ROM loader
-│   │   ├── layout.tsx                # Root layout with Geist fonts
-│   │   └── globals.css               # Theme & custom button/equalizer animations
+│   ├── main.tsx                      # Entry: router, routes & footer
+│   ├── index.css                     # Theme & custom button/equalizer animations
+│   ├── components/
+│   │   ├── ChannelButton.tsx         # Animated tactile channel button & equalizer
+│   │   ├── GameEmulator.tsx          # Isolated iframe emulator bridge
+│   │   ├── MusicScanPanel.tsx        # Music scan progress, verdicts & mute button
+│   │   ├── SoundChannelMixer.tsx     # 8-channel mixer
+│   │   └── footer.tsx                # Full-width footer component
+│   ├── pages/
+│   │   ├── HomePage.tsx              # Segmented compact ROM loader
+│   │   ├── ListPage.tsx              # GitHub ROM browser with virtual scrolling
+│   │   └── PlayPage.tsx              # Game player dashboard & controls
 │   ├── lib/
 │   │   ├── emulator/
 │   │   │   ├── channelState.ts       # Muting, soloing & reload state logic
@@ -153,7 +151,7 @@ bun run format
 
 ## Technologies
 
-- **Next.js 16** - React Framework (App Router)
+- **Vite + React Router** - Client-side SPA, deployed on Cloudflare
 - **React 19** - UI with React Compiler
 - **TypeScript** - Strict type safety
 - **Tailwind CSS 4** - Modern utility-first styling

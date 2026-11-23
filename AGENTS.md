@@ -4,38 +4,36 @@ This document provides guidance for AI agents and developers working on the Hurm
 
 ## Project Overview
 
-Hurmuzi is a Next.js 16 web application that embeds EmulatorJS to provide SNES emulation with advanced sound channel control and intelligent music channel detection. The key feature is granular control over the SNES SPC700's 8 audio channels.
+Hurmuzi is a client-side React single-page app (Vite) that embeds EmulatorJS to provide SNES emulation with advanced sound channel control and intelligent music channel detection. The key feature is granular control over the SNES SPC700's 8 audio channels.
 
 ## Architecture
 
 ### Tech Stack
-- **Framework**: Next.js 16 (App Router)
+- **Build**: Vite 8, React Router (client-side routes `/`, `/list`, `/play`)
 - **React**: 19.2.0 with React Compiler enabled
 - **TypeScript**: Latest (ESNext target)
 - **Styling**: Tailwind CSS 4
-- **Fonts**: Geist Sans & Geist Mono
+- **Fonts**: Geist Sans & Geist Mono (`@fontsource-variable`)
 - **Testing**: Bun test runner
 - **Linting/Formatting**: Biome
-- **Deployment**: Vercel
+- **Deployment**: Cloudflare Workers static assets at snes.al-iyaal.club (`cloudflare.config.ts`, `bun run deploy`)
 
 ### Directory Structure
 
 ```
 src/
-├── app/                          # Next.js App Router
-│   ├── components/               # React components
-│   │   ├── ChannelButton.tsx     # Channel toggle button with tactile & LED effects
-│   │   ├── GameEmulator.tsx     # Emulator iframe management
-│   │   ├── MusicScanPanel.tsx   # Music scan progress, verdicts & "Mute music channels"
-│   │   ├── SoundChannelMixer.tsx # 8-channel audio mixer
-│   │   └── footer.tsx           # Full-width footer component
-│   ├── list/                    # ROM library browser
-│   │   └── page.tsx             # Virtualized GitHub repository browser
-│   ├── play/                    # Game player page
-│   │   └── page.tsx             # Full-width emulator workspace & controls
-│   ├── page.tsx                 # Segmented compact ROM loader
-│   ├── layout.tsx               # Root layout with Geist typography
-│   └── globals.css              # Global styles & button/equalizer animations
+├── main.tsx                      # Entry: router, routes & footer
+├── index.css                     # Global styles & button/equalizer animations
+├── components/                   # React components
+│   ├── ChannelButton.tsx         # Channel toggle button with tactile & LED effects
+│   ├── GameEmulator.tsx          # Emulator iframe management
+│   ├── MusicScanPanel.tsx        # Music scan progress, verdicts & "Mute music channels"
+│   ├── SoundChannelMixer.tsx     # 8-channel audio mixer
+│   └── footer.tsx                # Full-width footer component
+├── pages/
+│   ├── HomePage.tsx              # Segmented compact ROM loader
+│   ├── ListPage.tsx              # Virtualized GitHub repository browser
+│   └── PlayPage.tsx              # Full-width emulator workspace & controls
 ├── lib/                          # Business logic
 │   ├── emulator/
 │   │   ├── types.ts             # Shared type definitions
@@ -176,7 +174,7 @@ describe("newFunction", () => {
 
 ### Adding a New Component
 
-1. Create component in `src/app/components/`
+1. Create component in `src/components/`
 2. Extract any business logic to `lib/`
 3. Use existing utilities from `lib/`
 4. Keep component focused on UI/interaction
@@ -224,6 +222,7 @@ bun run lint     # Run Biome checks
 bun run format   # Format with Biome
 bun test         # Run test suite
 bun run build    # Production build
+bun run deploy   # Build and deploy to Cloudflare
 ```
 
 ## Troubleshooting
@@ -244,7 +243,7 @@ Check:
 
 ### Build Errors
 
-- Clear `.next` directory: `rm -rf .next`
+- Clear build output: `rm -rf dist .cloudflare`
 - Clear node_modules: `rm -rf node_modules && bun install`
 - Check TypeScript errors: `bun run build`
 
@@ -273,7 +272,8 @@ Check:
 
 ## Additional Resources
 
-- [Next.js App Router Docs](https://nextjs.org/docs/app)
+- [Vite Docs](https://vite.dev)
+- [Cloudflare Workers static assets](https://developers.cloudflare.com/workers/static-assets/)
 - [EmulatorJS Documentation](https://emulatorjs.org)
 - [Bun Test Runner](https://bun.sh/docs/cli/test)
 - [Tailwind CSS v4](https://tailwindcss.com/docs)

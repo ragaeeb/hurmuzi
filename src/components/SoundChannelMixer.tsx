@@ -1,5 +1,3 @@
-'use client';
-
 import { useCallback, useState } from 'react';
 import { useChannelMixer } from '@/hooks/useChannelMixer';
 import type { MusicScanState } from '@/hooks/useMusicScan';

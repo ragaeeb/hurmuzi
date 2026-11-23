@@ -18,7 +18,7 @@
     },
     "files": {
         "ignoreUnknown": true,
-        "includes": ["**", "!node_modules", "!.next", "!dist", "!build", "!public/snes9x-probe"]
+        "includes": ["**", "!node_modules", "!dist", "!build", "!public/snes9x-probe"]
     },
     "formatter": {
         "enabled": true,
@@ -39,7 +39,6 @@
     },
     "linter": {
         "domains": {
-            "next": "recommended",
             "react": "recommended"
         },
         "enabled": true,
