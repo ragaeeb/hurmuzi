@@ -1,4 +1,4 @@
-import type { CoreOption, MusicDetectionResult } from './types';
+import type { CoreOption } from './types';
 import { SNES_CHANNELS } from './types';
 import { getSoundChannelOptions } from './utils';
 
@@ -68,8 +68,4 @@ export function updateEffectiveStateOnSolo(currentEffective: boolean[], soloedIn
     const updated = new Array(8).fill(false);
     updated[soloedIndex] = currentEffective[soloedIndex];
     return updated;
-}
-
-export function findLikelyMusicChannels(results: MusicDetectionResult[]): number[] {
-    return results.filter((result) => result.activeRatio > 0.5).map((result) => result.channel);
 }

@@ -3,9 +3,8 @@
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { measureCurrentChannelActivity } from '@/lib/emulator/musicDetection';
-import type { MusicDetectionResult } from '@/lib/emulator/types';
+import { Suspense, useEffect, useRef, useState } from 'react';
+import { useMusicScan } from '@/hooks/useMusicScan';
 import { getSavedChannelStates, saveChannelStates } from '@/lib/storage/channelStates';
 import { loadRomSource } from '@/lib/storage/roms';
 import type { CoreOption, GameEmulatorRef } from '../components/GameEmulator';
@@ -36,6 +35,7 @@ function PlayContent() {
     const [romBlob, setRomBlob] = useState<Blob | null>(null);
     const [romName, setRomName] = useState<string>('Unknown Game');
     const source = searchParams.get('source');
+    const musicScan = useMusicScan(romSource, romBlob);
 
     useEffect(() => {
         let cancelled = false;
@@ -103,24 +103,6 @@ function PlayContent() {
             saveChannelStates(romSource, states);
         }
     };
-
-    const handleDetectMusic = useCallback(
-        async (durationMs: number, onProgress: (percent: number) => void): Promise<MusicDetectionResult[]> => {
-            const emulator = emulatorRef.current;
-            if (!emulator) {
-                throw new Error('The emulator is not ready');
-            }
-
-            const results = await measureCurrentChannelActivity(() => emulator.getState(), durationMs, onProgress);
-
-            if (results.every((result) => result.maxLevel === 0)) {
-                throw new Error('No audio detected. Try again while music is playing and the emulator is unmuted.');
-            }
-
-            return results;
-        },
-        [],
-    );
 
     // Prevent arrow keys from scrolling
     useEffect(() => {
@@ -242,7 +224,7 @@ function PlayContent() {
                     <div className="flex flex-col gap-4 lg:col-span-4 xl:col-span-4">
                         <SoundChannelMixer
                             key={romSource}
-                            onDetectMusic={handleDetectMusic}
+                            musicScan={musicScan}
                             onSetVariable={handleSetVariable}
                             onReloadEmulator={handleReloadEmulator}
                             onSaveStates={handleSaveChannelStates}

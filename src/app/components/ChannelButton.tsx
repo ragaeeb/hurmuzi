@@ -1,18 +1,25 @@
 'use client';
 
+import type { ChannelRole } from '@/lib/emulator/musicScan';
 import type { SnesChannel } from '@/lib/emulator/types';
 
 interface ChannelButtonProps {
-    activityPercent?: number;
     channel: SnesChannel;
     isUIEnabled: boolean;
     isEffectivelyPlaying: boolean;
-    isLikelyMusic?: boolean;
+    /** What the music scan found on this channel, once it has finished. */
+    role?: ChannelRole;
     needsReloadForThis: boolean;
     disabled: boolean;
     onToggle: () => void;
     onSolo: () => void;
 }
+
+const ROLE_BADGES: Partial<Record<ChannelRole, { text: string; description: string; className: string }>> = {
+    effects: { className: 'text-emerald-300', description: 'sound effects', text: 'FX' },
+    music: { className: 'text-purple-300', description: 'music', text: '♪' },
+    shared: { className: 'text-sky-300', description: 'music and sound effects', text: '♪+FX' },
+};
 
 const EQ_ANIMATIONS = [
     'animate-eq-1',
@@ -25,22 +32,24 @@ const EQ_ANIMATIONS = [
 ];
 
 export default function ChannelButton({
-    activityPercent,
     channel,
     isUIEnabled,
     isEffectivelyPlaying,
-    isLikelyMusic = false,
+    role,
     needsReloadForThis,
     disabled,
     onToggle,
     onSolo,
 }: ChannelButtonProps) {
     const isLive = isEffectivelyPlaying && !disabled;
+    const isLikelyMusic = role === 'music';
+    const badge = role ? ROLE_BADGES[role] : undefined;
+    const roleNote = badge ? ` (${badge.description})` : '';
     const toggleLabel = needsReloadForThis
         ? `${channel.name} - Pending reload to unmute`
         : isUIEnabled
-          ? `Mute ${channel.name}${activityPercent !== undefined ? ` (${activityPercent}% active)` : ''}`
-          : `Unmute ${channel.name}`;
+          ? `Mute ${channel.name}${roleNote}`
+          : `Unmute ${channel.name}${roleNote}`;
 
     return (
         <div className="group/channel flex flex-col items-center gap-1">
@@ -96,14 +105,12 @@ export default function ChannelButton({
                     </div>
                 )}
 
-                {/* Music detected icon badge */}
-                {isLikelyMusic && isUIEnabled && !needsReloadForThis && !disabled && (
-                    <div className="absolute top-1 left-1 text-[8px] text-purple-300">🎵</div>
-                )}
-
-                {activityPercent !== undefined && (
-                    <div className="absolute bottom-1 left-1 rounded bg-black/60 px-1 font-mono text-[8px] text-white">
-                        {activityPercent}%
+                {/* Music scan verdict */}
+                {badge && (
+                    <div
+                        className={`absolute bottom-1 left-1 rounded bg-black/60 px-1 font-mono text-[8px] font-semibold ${badge.className}`}
+                    >
+                        {badge.text}
                     </div>
                 )}
 

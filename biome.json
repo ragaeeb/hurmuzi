@@ -18,7 +18,7 @@
     },
     "files": {
         "ignoreUnknown": true,
-        "includes": ["**", "!node_modules", "!.next", "!dist", "!build"]
+        "includes": ["**", "!node_modules", "!.next", "!dist", "!build", "!public/snes9x-probe"]
     },
     "formatter": {
         "enabled": true,

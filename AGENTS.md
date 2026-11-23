@@ -26,7 +26,8 @@ src/
 │   ├── components/               # React components
 │   │   ├── ChannelButton.tsx     # Channel toggle button with tactile & LED effects
 │   │   ├── GameEmulator.tsx     # Emulator iframe management
-│   │   ├── SoundChannelMixer.tsx # 8-channel audio mixer & music detection UI
+│   │   ├── MusicScanPanel.tsx   # Music scan progress, verdicts & "Mute music channels"
+│   │   ├── SoundChannelMixer.tsx # 8-channel audio mixer
 │   │   └── footer.tsx           # Full-width footer component
 │   ├── list/                    # ROM library browser
 │   │   └── page.tsx             # Virtualized GitHub repository browser
@@ -40,14 +41,18 @@ src/
 │   │   ├── types.ts             # Shared type definitions
 │   │   ├── utils.ts             # Core parsing & ROM format validation
 │   │   ├── channelState.ts      # Channel muting & solo state management
-│   │   ├── musicDetection.ts    # SPC700 voice envelope & activity analysis
+│   │   ├── musicScan.ts         # Deterministic music/effects channel scan
+│   │   ├── musicScanWorker.ts   # Web Worker entry point for the scan
+│   │   ├── voiceProbe.ts        # Wrapper around the headless Snes9x voice probe
 │   │   └── __tests__/           # Unit tests
 │   └── storage/
 │       ├── channelStates.ts     # localStorage operations for audio preferences
+│       ├── musicScans.ts        # localStorage music scan results (per ROM)
 │       ├── roms.ts              # OPFS & cached ROM management
 │       └── __tests__/           # Unit tests
 └── hooks/
     ├── useChannelMixer.ts       # Audio channel state management hook
+    ├── useMusicScan.ts          # Runs or recalls the music scan for a ROM
     └── useEmulatorSetup.ts      # Emulator initialization & iframe lifecycle
 ```
 
@@ -71,11 +76,17 @@ SNES has 8 audio channels (`snes9x_sndchan_1` through `snes9x_sndchan_8`):
 
 ### Music Detection System
 
-Hurmuzi includes zero-reload music vs SFX voice classification:
+Which channels carry music is worked out by a deterministic scan, not by listening to the game the user is playing:
 
-1. **Sampling**: Periodically reads Snes9x DSP memory registers to inspect envelope heights and voice activity over 2–10 seconds.
-2. **Analysis**: Sustained high-activity voices are tagged as likely music channels, while bursty or inactive voices are categorized as SFX.
-3. **UI Integration**: Highlights likely music channels with badges and animated equalizers.
+1. **Probe**: `core/snes9x-probe/` is a headless build of the unmodified Snes9x core (prebuilt in `public/snes9x-probe/`). It runs a ROM with no picture or audio output, about 60x faster than real time, and reports the state of the eight DSP voices every frame.
+2. **Script**: `lib/emulator/musicScan.ts` runs the ROM from power-on with a fixed input script: wait for the first sound, tap Start to get past the title and menus, then keep going with an occasional Start tap. The same ROM always gives the same result.
+3. **Evidence**: every two seconds the scan replays one second of the game several times, each with a different button held, and compares that with the same second left alone. A voice that sounds the same either way is music; a voice that changes when a button is pressed is playing sound effects.
+4. **Verdict**: each channel is `music`, `effects`, `shared` (music that effects cut in on) or `unused`. The mixer offers to mute the `music` channels; `shared` ones are left on so effects are not lost.
+5. **Where it runs**: in a Web Worker (`useMusicScan`), started when a ROM loads. Results are cached per ROM in localStorage and invalidated by bumping `MUSIC_SCAN_VERSION`.
+
+It is a best-effort guess: the script only reaches the first minutes of a game, and games that share every channel between music and effects have nothing safe to mute.
+
+`bun run scan <rom>` runs the same scan from the command line, prints the evidence per channel, and measures on the real audio output how much unprompted sound the suggested mute removes and how much button-press sound it keeps (`--timeline`, `--screens=<dir>` and `--mute=1,2` help when a verdict looks wrong). Snes9x is licensed for non-commercial use only; see `core/snes9x-probe/README.md`.
 
 ### State Management Pattern
 
@@ -249,7 +260,7 @@ Check:
 - ROMs processed locally (never uploaded)
 - Iframe sandbox: `allow-scripts allow-same-origin allow-pointer-lock`
 - No external data collection
-- localStorage only for channel preferences
+- localStorage only for channel preferences and music scan results
 
 ## Contributing
 

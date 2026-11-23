@@ -177,6 +177,20 @@ export function useChannelMixer({
         [onSetVariable],
     );
 
+    const handleMute = useCallback(
+        (channelIndexes: number[]) => {
+            for (const index of channelIndexes) {
+                onSetVariable(SNES_CHANNELS[index].varKey, 'disabled');
+            }
+
+            // Muting takes effect immediately, so both the UI and the effective state follow.
+            const mute = (states: boolean[]) => states.map((on, index) => on && !channelIndexes.includes(index));
+            setChannels(mute);
+            setEffectiveAudioState(mute);
+        },
+        [onSetVariable],
+    );
+
     const applyWithReload = useCallback(async () => {
         if (!onReloadEmulator) {
             console.warn('No reload function provided');
@@ -207,6 +221,7 @@ export function useChannelMixer({
         applyWithReload,
         channels,
         effectiveAudioState,
+        handleMute,
         handleSolo,
         handleToggle,
         handleToggleAll,

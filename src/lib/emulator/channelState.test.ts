@@ -2,7 +2,6 @@ import { describe, expect, it } from 'bun:test';
 import {
     areAllChannelsEnabled,
     createPendingSettings,
-    findLikelyMusicChannels,
     hasSoundChannelSupport,
     initializeChannelStates,
     needsReload,
@@ -136,17 +135,5 @@ describe('updateEffectiveStateOnSolo', () => {
         const result = updateEffectiveStateOnSolo(current, 2);
 
         expect(result[2]).toBe(false);
-    });
-});
-
-describe('findLikelyMusicChannels', () => {
-    it('should return every channel active for the majority of the sample', () => {
-        const result = findLikelyMusicChannels([
-            { activeRatio: 0.8, averageLevel: 0.1, channel: 1, maxLevel: 0.2, samples: 100 },
-            { activeRatio: 0.5, averageLevel: 0.1, channel: 2, maxLevel: 0.2, samples: 100 },
-            { activeRatio: 0.65, averageLevel: 0.1, channel: 3, maxLevel: 0.2, samples: 100 },
-        ]);
-
-        expect(result).toEqual([1, 3]);
     });
 });

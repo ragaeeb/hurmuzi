@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# snes9x probe build checkout
+/core/snes9x-probe/vendor

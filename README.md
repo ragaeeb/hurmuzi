@@ -14,7 +14,7 @@ A web-based SNES emulator with advanced sound channel mixing capabilities and in
 ## Features
 
 - **🎵 8-Channel Audio Mixer**: Independently mute, unmute, and solo each of the SNES SPC700 sound channels with real-time waveform equalization.
-- **✨ Intelligent Music Detection**: Sample active audio voices in real-time (2s–10s) to detect and highlight likely music channels without reloading.
+- **✨ Music Channel Detection**: Each ROM is scanned once in the background to work out which channels carry music, which carry sound effects and which carry both, with a one-click "Mute music channels".
 - **💾 State Persistence & Recent ROMs**: Audio channel states and cached ROM files automatically saved for instant quick-play access.
 - **📚 GitHub ROM Library Browser**: Search, filter, and launch games directly from GitHub repositories with high-performance virtual scrolling.
 - **🎮 Full SNES Format Support**: Seamless compatibility with `.smc`, `.sfc`, `.fig`, `.swc`, `.bs`, and `.st` files.
@@ -78,7 +78,7 @@ Paste a direct download link or GitHub raw URL (e.g. `https://raw.githubusercont
 
 1. **Launch**: Games automatically load and start in the responsive player workspace.
 2. **Channel Control**: Click channel buttons (CH 1–8) to mute or solo voices.
-3. **Music Channel Detection**: Click **"Detect Music Channels"** to sample the live SPC700 audio and identify music melodies vs sound effects.
+3. **Music Channel Detection**: A few seconds after a game loads, the mixer labels each channel as music (♪), effects (FX) or both (♪+FX). Click **"Mute music channels"** to silence the music-only channels and keep the effects. The result is a best guess and is remembered per ROM.
 4. **Applying Changes**: Immediate muting occurs live; re-enabling channels uses a one-click reload that preserves game state.
 
 ### Keyboard Controls
@@ -103,7 +103,8 @@ hurmuzi/
 │   │   ├── components/
 │   │   │   ├── ChannelButton.tsx     # Animated tactile channel button & equalizer
 │   │   │   ├── GameEmulator.tsx      # Isolated iframe emulator bridge
-│   │   │   ├── SoundChannelMixer.tsx # 8-channel mixer & music detection UI
+│   │   │   ├── MusicScanPanel.tsx    # Music scan progress, verdicts & mute button
+│   │   │   ├── SoundChannelMixer.tsx # 8-channel mixer
 │   │   │   └── footer.tsx            # Full-width footer component
 │   │   ├── list/
 │   │   │   └── page.tsx              # GitHub ROM browser with virtual scrolling
@@ -115,16 +116,22 @@ hurmuzi/
 │   ├── lib/
 │   │   ├── emulator/
 │   │   │   ├── channelState.ts       # Muting, soloing & reload state logic
-│   │   │   ├── musicDetection.ts     # SPC700 voice sampling & activity detection
+│   │   │   ├── musicScan.ts          # Deterministic music/effects channel scan
+│   │   │   ├── musicScanWorker.ts    # Web Worker that runs the scan
+│   │   │   ├── voiceProbe.ts         # Wrapper around the headless Snes9x voice probe
 │   │   │   ├── types.ts              # Emulator & channel type definitions
 │   │   │   └── utils.ts              # Core parsing & ROM format validation
 │   │   └── storage/
 │   │       ├── channelStates.ts      # localStorage channel persistence
+│   │       ├── musicScans.ts         # localStorage music scan results
 │   │       └── roms.ts               # OPFS & cached ROM management
 │   └── hooks/
 │       ├── useChannelMixer.ts        # Channel toggle & effective state hook
+│       ├── useMusicScan.ts           # Runs or recalls the music scan for a ROM
 │       └── useEmulatorSetup.ts       # Emulator iframe lifecycle hook
-├── public/                           # Static assets
+├── core/snes9x-probe/                # Source & build script of the headless voice probe
+├── scripts/scan-rom.ts               # Command-line harness for the music scan
+├── public/                           # Static assets (incl. the prebuilt voice probe)
 └── package.json
 ```
 
@@ -157,6 +164,8 @@ bun run format
 ## License
 
 MIT License - see [LICENSE](./LICENSE) for details.
+
+The prebuilt voice probe in `public/snes9x-probe/` contains Snes9x, which is licensed separately for non-commercial use only - see [core/snes9x-probe/README.md](./core/snes9x-probe/README.md).
 
 ## Author
 
